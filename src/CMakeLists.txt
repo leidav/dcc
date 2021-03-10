@@ -1,5 +1,7 @@
 add_executable(dcc main.c)
 target_sources(dcc PRIVATE 
+               "${CMAKE_CURRENT_SOURCE_DIR}/lexer.c" 
+               "${CMAKE_CURRENT_SOURCE_DIR}/lexer.h"
                "${CMAKE_CURRENT_SOURCE_DIR}/string_set.c" 
                "${CMAKE_CURRENT_SOURCE_DIR}/string_set.h"
                "${CMAKE_CURRENT_SOURCE_DIR}/allocator.c" 
