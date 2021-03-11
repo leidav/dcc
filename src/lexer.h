@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "input_file.h"
 #include "string_set.h"
 
 enum TokenType {
@@ -78,6 +79,8 @@ enum TokenType {
 	LITERAL_UNSIGNED_INT,
 	LITERAL_FLOAT,
 	LITERAL_DOUBLE,
+	// end of file
+	TOKEN_EOF,
 };
 
 struct LexerToken {
@@ -98,7 +101,7 @@ struct LexerState {
 	uint16_t current_line;
 	uint16_t current_column;
 	int current_pos;
-	FILE* current_file;
+	struct InputFile current_file;
 	struct StringSet identifiers;
 	struct StringSet string_literals;
 };
