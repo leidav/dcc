@@ -16,32 +16,33 @@ static uint32_t fnv1a(const char* string, int length)
 }
 
 static int createString(struct String* string, const char* str, int length,
-                        struct LinearAllocator* allocator)
+                        struct LinearAllocator* string_allocator)
 {
-	string->len = length;
-	if (length <= SHORT_STRING_LEN) {
-		memcpy(string->string.chars, string, length);
-		string->string.chars[length] = 0;
-	} else {
-		void* ptr = allocate(allocator, length + 1);
-		if (!ptr) {
-			return -1;
-		}
-		string->string.ptr = ptr;
-		memcpy(string->string.ptr, string, length);
-		string->string.ptr[length] = 0;
+	string->length = length;
+	char* ptr = allocate(string_allocator, length + 1);
+	if (!ptr) {
+		return -1;
 	}
+	string->offset = ptr - (char*)string_allocator->start;
+	memcpy(ptr, string, length);
+	ptr[length] = 0;
 	return 0;
 }
 
-static bool compareStrings(const struct String* string, const char* string2,
-                           int length2)
+static const char* getString(const struct String* string,
+                             struct LinearAllocator* string_allocator)
 {
-	int length = string->len;
+	return string_allocator->start + string->offset;
+}
+
+static bool compareStrings(const struct String* string, const char* string2,
+                           int length2, struct StringSet* stringset)
+{
+	int length = string->length;
 	if (length != length2) {
 		return false;
 	}
-	const char* string1 = getString(string);
+	const char* string1 = getString(string, &stringset->string_allocator);
 	for (int i = 0; i < length; i++) {
 		if (*string1 != *string2) {
 			return false;
@@ -79,7 +80,8 @@ int addString(struct StringSet* stringset, const char* string, int length)
 	uint32_t hash = fnv1a(string, length);
 	for (int i = 0; i < stringset->num; i++) {
 		if (stringset->hashes[i] == hash) {
-			if (compareStrings(&stringset->strings[i], string, length)) {
+			if (compareStrings(&stringset->strings[i], string, length,
+			                   stringset)) {
 				return i;
 			}
 		}
@@ -93,10 +95,7 @@ int addString(struct StringSet* stringset, const char* string, int length)
 	             &stringset->string_allocator);
 }
 
-const char* getString(const struct String* string)
+const char* getStringAt(struct StringSet* stringset, int index)
 {
-	if (string->len <= SHORT_STRING_LEN) {
-		return string->string.chars;
-	}
-	return string->string.ptr;
+	return getString(&stringset->strings[index], &stringset->string_allocator);
 }

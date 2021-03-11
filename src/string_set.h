@@ -4,19 +4,13 @@
 #include <stdint.h>
 
 #include "allocator.h"
-#define SHORT_STRING_LEN 9
-
-struct String {
-	union {
-		char* ptr;
-		char chars[SHORT_STRING_LEN + 1];
-	} string;
-	uint16_t len;
-};
 
 struct StringSet {
 	struct LinearAllocator string_allocator;
-	struct String* strings;
+	struct String {
+		uint16_t offset;
+		uint16_t length;
+	} * strings;
 	uint32_t* hashes;
 	int num;
 	int max_num;
@@ -30,6 +24,6 @@ int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
 
 int addString(struct StringSet* stringset, const char* string, int length);
 
-const char* getString(const struct String* string);
+const char* getStringAt(struct StringSet* stringset, int index);
 
 #endif
