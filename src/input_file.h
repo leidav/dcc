@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define INPUT_CHUNK_SIZE (4096 * 4)
+#define INPUT_CHUNK_SIZE (4096 << 2)
 #define INPUT_EOF 0x4
 
 struct InputFile {

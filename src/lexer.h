@@ -1,11 +1,18 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
 #include "input_file.h"
 #include "string_set.h"
+
+#define LEXER_IDENTIFIER_STRINGSET_SIZE (4096 << 2)
+#define LEXER_LITERAL_STRINGSET_SIZE (4096 << 3)
+
+#define LEXER_MAX_IDENTIFIER_COUNT 128
+#define LEXER_MAX_STRING_LITERAL_COUNT 64
 
 enum TokenType {
 	IDENTIFIER = 0,
@@ -35,6 +42,7 @@ enum TokenType {
 	OPERATOR_PLUS,
 	OPERATOR_MINUS,
 	OPERATOR_DIV,
+	OPERATOR_MODULO,
 	OPERATOR_PLUSPLUS,
 	OPERATOR_MINUSMINUS,
 	OPERATOR_AND,
@@ -45,21 +53,27 @@ enum TokenType {
 	OPERATOR_NEGATE,
 	OPERATOR_LOGICAL_AND,
 	OPERATOR_LOGICAL_OR,
+	OPERATOR_LOGICAL_NOT,
 	OPERATOR_EQUAL,
+	OPERATOR_NOT_EQUAL,
 	OPERATOR_LESS,
-	OPERATOR_BIGGER,
+	OPERATOR_GREATER,
 	OPERATOR_LESS_OR_EQUAL,
-	OPERATOR_BIGGER_OR_EQUL,
+	OPERATOR_GREATER_OR_EQUAL,
 	OPERATOR_ASSIGNMENT,
 	OPERATOR_PLUS_ASSIGNMENT,
 	OPERATOR_MINUS_ASSIGNMENT,
 	OPERATOR_MUL_ASSIGNMENT,
 	OPERATOR_DIV_ASSIGNMENT,
+	OPERATOR_MODULO_ASSIGNMENT,
 	OPERATOR_AND_ASSIGNMENT,
 	OPERATOR_OR_ASSIGNMENT,
 	OPERATOR_XOR_ASSIGNMENT,
+	OPERATOR_SHIFT_LEFT_ASSIGNMENT,
+	OPERATOR_SHIFT_RIGHT_ASSIGNMENT,
 	OPERATOR_POINT,
 	OPERATOR_DEREFERENCE,
+	OPERATOR_CONDITIONAL,
 	/*other symbols*/
 	PARENTHESE_LEFT,
 	PARENTHESE_RIGHT,
@@ -98,16 +112,17 @@ struct LexerToken {
 };
 
 struct LexerState {
-	uint16_t current_line;
-	uint16_t current_column;
-	int current_pos;
+	uint16_t line;
+	uint16_t column;
+	char c;
+	int pos;
 	struct InputFile current_file;
 	struct StringSet identifiers;
 	struct StringSet string_literals;
 };
 
-void initLexer(struct LexerState* state);
+int initLexer(struct LexerState* state, const char* file_path);
 
-int getNextToken(struct LexerState* state, struct LexerToken* token);
+bool getNextToken(struct LexerState* state, struct LexerToken* token);
 
 #endif
