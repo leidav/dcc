@@ -4,13 +4,14 @@
 #include <stdint.h>
 
 #include "allocator.h"
+struct StringSetString {
+	uint16_t offset;
+	uint16_t length;
+};
 
 struct StringSet {
 	struct LinearAllocator string_allocator;
-	struct String {
-		uint16_t offset;
-		uint16_t length;
-	} * strings;
+	struct StringSetString* strings;
 	uint32_t* hashes;
 	int num;
 	int max_num;

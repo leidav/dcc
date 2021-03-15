@@ -28,7 +28,8 @@ int main()
 	while (validInput) {
 		struct LexerToken token;
 		validInput = getNextToken(&lexer_state, &token);
-		printToken(&token);
+		printToken(&lexer_state, &token);
+
 		if (token.type == TOKEN_EOF) {
 			break;
 		}

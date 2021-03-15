@@ -29,6 +29,7 @@ enum TokenType {
 	KEYWORD_ENUM,
 	KEYWORD_UNION,
 	KEYWORD_TYPEDEF,
+	KEYWORD_VOID,
 	KEYWORD_CHAR,
 	KEYWORD_SHORT,
 	KEYWORD_INT,
@@ -38,6 +39,8 @@ enum TokenType {
 	KEYWORD_UNSIGNED,
 	KEYWORD_STATIC,
 	KEYWORD_EXTERN,
+	KEYWORD_CONST,
+	KEYWORD_INLINE,
 	/*operators*/
 	OPERATOR_PLUS,
 	OPERATOR_MINUS,
@@ -102,7 +105,7 @@ struct LexerToken {
 	uint16_t column;
 	enum TokenType type;
 	union {
-		struct LexerString* string;
+		uint16_t string_index;
 		char character_literal;
 		int64_t int_literal;
 		uint64_t uint_literal;
@@ -125,6 +128,6 @@ int initLexer(struct LexerState* state, const char* file_path);
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token);
 
-void printToken(struct LexerToken* token);
+void printToken(struct LexerState* state, struct LexerToken* token);
 
 #endif
