@@ -93,10 +93,10 @@ enum TokenType {
 	LITERAL_UNSIGNED_INT,
 	LITERAL_FLOAT,
 	LITERAL_DOUBLE,
-	// end of file
+	// other
 	TOKEN_EOF,
+	TOKEN_UNKNOWN,
 };
-
 struct LexerToken {
 	uint16_t line;
 	uint16_t column;
@@ -124,5 +124,7 @@ struct LexerState {
 int initLexer(struct LexerState* state, const char* file_path);
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token);
+
+void printToken(struct LexerToken* token);
 
 #endif

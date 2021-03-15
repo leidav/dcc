@@ -1,6 +1,7 @@
 #include "string_set.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -56,11 +57,20 @@ static bool compareStrings(const struct String* string, const char* string2,
 int createStringSet(struct StringSet* stringset, size_t allocator_size,
                     int max_strings)
 {
-	createAllocator(&stringset->string_allocator, allocator_size);
+	if (createAllocator(&stringset->string_allocator, allocator_size) != 0) {
+		return -1;
+	}
 	stringset->num = 0;
 	stringset->max_num = max_strings;
 	stringset->strings = malloc(sizeof(*stringset->strings) * max_strings);
 	stringset->hashes = malloc(sizeof(*stringset->hashes) * max_strings);
+	if (!stringset->strings) {
+		return -1;
+	}
+	if (!stringset->hashes) {
+		return -1;
+	}
+	return 0;
 }
 
 int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
@@ -73,6 +83,7 @@ int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
 	stringset->hashes = NULL;
 	stringset->num = 0;
 	stringset->max_num = 0;
+	return 0;
 }
 
 int addString(struct StringSet* stringset, const char* string, int length)
@@ -93,6 +104,7 @@ int addString(struct StringSet* stringset, const char* string, int length)
 	stringset->hashes[num] = hash;
 	createString(&stringset->strings[num], string, length,
 	             &stringset->string_allocator);
+	return num;
 }
 
 const char* getStringAt(struct StringSet* stringset, int index)

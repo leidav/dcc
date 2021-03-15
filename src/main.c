@@ -15,8 +15,23 @@
 
 #include <stdio.h>
 
+#include "lexer.h"
+
 int main()
 {
-	printf("Hello World!\n");
+	struct LexerState lexer_state;
+	if (initLexer(&lexer_state, "/home/david/projects/dcc/build/test.c") != 0) {
+		fprintf(stderr, "could not initialize lexer\n");
+		return -1;
+	}
+	bool validInput = true;
+	while (validInput) {
+		struct LexerToken token;
+		validInput = getNextToken(&lexer_state, &token);
+		printToken(&token);
+		if (token.type == TOKEN_EOF) {
+			break;
+		}
+	}
 	return 0;
 }

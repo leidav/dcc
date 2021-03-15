@@ -7,6 +7,90 @@ struct FileContext {
 	int column;
 };
 
+static const char* tokenNames[] = {
+    "IDENTIFIER",
+    /*keywords*/
+    "KEYWORD_IF",
+    "KEYWORD_ELSE",
+    "KEYWORD_WHILE",
+    "KEYOWRD_FOR",
+    "KEYWORD_DO",
+    "KEYWORD_SWITCH",
+    "KEYWORD_CASE",
+    "KEYWORD_BREAK",
+    "KEYWORD_STRUCT",
+    "KEYWORD_ENUM",
+    "KEYWORD_UNION",
+    "KEYWORD_TYPEDEF",
+    "KEYWORD_CHAR",
+    "KEYWORD_SHORT",
+    "KEYWORD_INT",
+    "KEYWORD_FLOAT",
+    "KEYWORD_DOUBLE",
+    "KEYWORD_SIGNED",
+    "KEYWORD_UNSIGNED",
+    "KEYWORD_STATIC",
+    "KEYWORD_EXTERN",
+    /*operators*/
+    "OPERATOR_PLUS",
+    "OPERATOR_MINUS",
+    "OPERATOR_DIV",
+    "OPERATOR_MODULO",
+    "OPERATOR_PLUSPLUS",
+    "OPERATOR_MINUSMINUS",
+    "OPERATOR_AND",
+    "OPERATOR_OR",
+    "OPERATOR_XOR",
+    "OPERATOR_SHIFT_LEFT",
+    "OPERATOR_SHIFT_RIGHT",
+    "OPERATOR_NEGATE",
+    "OPERATOR_LOGICAL_AND",
+    "OPERATOR_LOGICAL_OR",
+    "OPERATOR_LOGICAL_NOT",
+    "OPERATOR_EQUAL",
+    "OPERATOR_NOT_EQUAL",
+    "OPERATOR_LESS",
+    "OPERATOR_GREATER",
+    "OPERATOR_LESS_OR_EQUAL",
+    "OPERATOR_GREATER_OR_EQUAL",
+    "OPERATOR_ASSIGNMENT",
+    "OPERATOR_PLUS_ASSIGNMENT",
+    "OPERATOR_MINUS_ASSIGNMENT",
+    "OPERATOR_MUL_ASSIGNMENT",
+    "OPERATOR_DIV_ASSIGNMENT",
+    "OPERATOR_MODULO_ASSIGNMENT",
+    "OPERATOR_AND_ASSIGNMENT",
+    "OPERATOR_OR_ASSIGNMENT",
+    "OPERATOR_XOR_ASSIGNMENT",
+    "OPERATOR_SHIFT_LEFT_ASSIGNMENT",
+    "OPERATOR_SHIFT_RIGHT_ASSIGNMENT",
+    "OPERATOR_POINT",
+    "OPERATOR_DEREFERENCE",
+    "OPERATOR_CONDITIONAL",
+    /*other symbols*/
+    "PARENTHESE_LEFT",
+    "PARENTHESE_RIGHT",
+    "BRACKET_LEFT",
+    "BRACKET_RIGHT",
+    "BRACE_LEFT",
+    "BRACE_RIGHT",
+    "ASTERISC",
+    "COMMA",
+    "COLON",
+    "SEMICOLON",
+    /*literals*/
+    "LITERAL_STRING",
+    "LITERAL_CHAR",
+    "LITERAL_UNSIGNED_CHAR",
+    "LITERAL_INT",
+    "LITERAL_UNSIGNED_INT",
+    "LITERAL_FLOAT",
+    "LITERAL_DOUBLE",
+    // end of file
+    "TOKEN_EOF",
+    "TOKEN_UNKNOWN",
+};
+
 static void getFileContext(struct LexerState* state, struct FileContext* ctx)
 {
 	ctx->line = state->line;
@@ -43,7 +127,7 @@ static int createIntegerLiteralToken(struct LexerToken* token,
 
 static const char* fileName(const char* path)
 {
-	int last_seperator = 0;
+	int last_seperator = -1;
 	int i = 0;
 	const char* ptr = path;
 	while (*ptr) {
@@ -67,15 +151,17 @@ int initLexer(struct LexerState* state, const char* file_path)
 	state->line = 0;
 	state->column = 0;
 	state->pos = 0;
-	if (!openInputFile(&state->current_file, file_path, fileName(file_path))) {
+	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
+	    0) {
+		fprintf(stderr, "could not open file\n");
 		return -1;
 	}
-	if (!createStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
-	                     LEXER_MAX_IDENTIFIER_COUNT)) {
+	if (createStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
+	                    LEXER_MAX_IDENTIFIER_COUNT) != 0) {
 		return -1;
 	}
-	if (!createStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
-	                     LEXER_MAX_STRING_LITERAL_COUNT)) {
+	if (createStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
+	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
 		return -1;
 	}
 	consumeInput(state);
@@ -162,37 +248,37 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 static bool lexNumber(struct LexerState* state, struct LexerToken* token,
                       const struct FileContext* ctx)
 {
-	state->column++;
-	consumeInput(state);
-	return true;
+	// state->column++;
+	// consumeInput(state);
+	return false;
 }
 static bool lexFractionalNumber(struct LexerState* state,
                                 struct LexerToken* token,
                                 const struct FileContext* ctx)
 {
-	state->column++;
-	consumeInput(state);
-	return true;
+	// state->column++;
+	// consumeInput(state);
+	return false;
 }
 
 static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
                          const struct FileContext* ctx)
 {
-	state->column++;
-	consumeInput(state);
-	return true;
+	// state->column++;
+	// consumeInput(state);
+	return false;
 }
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
 	bool success = true;
 	struct FileContext ctx;
+	skipIfWhiteSpace(state);
+	getFileContext(state, &ctx);
 	if (state->c == INPUT_EOF) {
 		getFileContext(state, &ctx);
 		createSimpleToken(token, &ctx, TOKEN_EOF);
 	} else {
-		skipIfWhiteSpace(state);
-		getFileContext(state, &ctx);
 		if (state->c == '/') {
 			state->column++;
 			consumeInput(state);
@@ -479,7 +565,14 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 
 		} else {
 			success = false;
+			token->type = TOKEN_UNKNOWN;
 		}
 	}
 	return success;
+}
+
+void printToken(struct LexerToken* token)
+{
+	printf("line:%d, column: %d, type: <%s>\n", token->line, token->column,
+	       tokenNames[token->type]);
 }
