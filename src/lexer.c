@@ -1,6 +1,7 @@
 #include "lexer.h"
 
 #include <stdbool.h>
+#include <string.h>
 
 struct FileContext {
 	int line;
@@ -34,6 +35,8 @@ static const char* tokenNames[] = {
     "KEYWORD_EXTERN",
     "KEYWORD_CONST",
     "KEYWORD_INLINE",
+    "KEYWORD_RETURN",
+    "KEYWORD_GOTO",
     /*operators*/
     "OPERATOR_PLUS",
     "OPERATOR_MINUS",
@@ -219,6 +222,7 @@ static bool skipMultiLineComment(struct LexerState* state)
 			consumeInput(state);
 			if (state->c == '/') {
 				state->column++;
+				consumeInput(state);
 				break;
 			}
 		} else {
@@ -273,8 +277,67 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	if (!success) {
 		return false;
 	}
-	int string = addString(&state->identifiers, buffer, length);
-	createIdentifierToken(token, ctx, string);
+	buffer[length] = 0;
+	if (strcmp("if", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_IF);
+	} else if (strcmp("else", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_ELSE);
+	} else if (strcmp("while", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_WHILE);
+	} else if (strcmp("for", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_FOR);
+	} else if (strcmp("do", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_DO);
+	} else if (strcmp("switch", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_SWITCH);
+	} else if (strcmp("case", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_CASE);
+	} else if (strcmp("break", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_BREAK);
+	} else if (strcmp("struct", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_STRUCT);
+	} else if (strcmp("enum", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_ENUM);
+	} else if (strcmp("union", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_UNION);
+	} else if (strcmp("typedef", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_TYPEDEF);
+	} else if (strcmp("void", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_VOID);
+	} else if (strcmp("char", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_CHAR);
+	} else if (strcmp("short", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_SHORT);
+	} else if (strcmp("int", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_INT);
+	} else if (strcmp("float", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_FLOAT);
+	} else if (strcmp("double", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_DOUBLE);
+	} else if (strcmp("double", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_DOUBLE);
+	} else if (strcmp("signed", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_SIGNED);
+	} else if (strcmp("unsigned", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_UNSIGNED);
+	} else if (strcmp("unsigned", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_UNSIGNED);
+	} else if (strcmp("static", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_STATIC);
+	} else if (strcmp("extern", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_EXTERN);
+	} else if (strcmp("const", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_CONST);
+	} else if (strcmp("inline", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_INLINE);
+	} else if (strcmp("return", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_RETURN);
+	} else if (strcmp("goto", buffer) == 0) {
+		createSimpleToken(token, ctx, KEYWORD_GOTO);
+	} else {
+		int string = addString(&state->identifiers, buffer, length);
+		createIdentifierToken(token, ctx, string);
+	}
 	return true;
 }
 
