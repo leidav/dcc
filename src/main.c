@@ -28,7 +28,12 @@ int main()
 	while (validInput) {
 		struct LexerToken token;
 		validInput = getNextToken(&lexer_state, &token);
-		printToken(&lexer_state, &token);
+		if (!validInput) {
+			printf("lexer error at line %d column %d\n", lexer_state.line + 1,
+			       lexer_state.column + 1);
+		} else {
+			printToken(&lexer_state, &token);
+		}
 
 		if (token.type == TOKEN_EOF) {
 			break;

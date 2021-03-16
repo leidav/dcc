@@ -8,6 +8,8 @@ struct FileContext {
 	int column;
 };
 
+static bool consumeLexableChar(struct LexerState* state);
+
 static const char* tokenNames[] = {
     "IDENTIFIER",
     /*keywords*/
@@ -212,6 +214,14 @@ static void skipWhiteSpaces(struct LexerState* state)
 	}
 }
 
+static void skipTabsAndSpaces(struct LexerState* state)
+{
+	while ((state->c == ' ') || (state->c == '\t')) {
+		state->column++;
+		consumeInput(state);
+	}
+}
+
 static bool skipMultiLineComment(struct LexerState* state)
 {
 	bool success = true;
@@ -264,8 +274,9 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 			break;
 		}
 		buffer[length] = state->c;
-		state->column++;
-		consumeInput(state);
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
 		length++;
 
 		// identifier to long
@@ -344,25 +355,42 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 static bool lexNumber(struct LexerState* state, struct LexerToken* token,
                       const struct FileContext* ctx)
 {
-	// state->column++;
-	// consumeInput(state);
+	// success=consumeLexableChar(state);
 	return false;
 }
 static bool lexFractionalNumber(struct LexerState* state,
                                 struct LexerToken* token,
                                 const struct FileContext* ctx)
 {
-	// state->column++;
-	// consumeInput(state);
+	// success=consumeLexableChar(state);
 	return false;
 }
 
 static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
                          const struct FileContext* ctx)
 {
-	// state->column++;
-	// consumeInput(state);
+	// success=consumeLexableChar(state);
 	return false;
+}
+
+static bool consumeLexableChar(struct LexerState* state)
+{
+	bool success = true;
+	state->column++;
+	consumeInput(state);
+	if (state->c == '\\') {
+		state->column++;
+		consumeInput(state);
+		skipTabsAndSpaces(state);
+		if (state->c != '\n') {
+			success = false;
+		} else {
+			state->column = 0;
+			state->line++;
+			consumeInput(state);
+		}
+	}
+	return success;
 }
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
@@ -379,167 +407,196 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			createSimpleToken(token, &ctx, TOKEN_EOF);
 		} else {
 			if (state->c == '/') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '/') {
 					// Single Line Comment
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					skipSingleLineComment(state);
 					again = true;
 				} else if (state->c == '*') {
 					// Multi Line Comment
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					success = skipMultiLineComment(state);
 					if (success) {
 						again = true;
 					}
 				} else if (state->c == '=') {
 					// Divison Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_DIV_ASSIGNMENT);
 				} else {
 					//  Division Operator
 					createSimpleToken(token, &ctx, OPERATOR_DIV);
 				}
 			} else if (state->c == '*') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Multiplication Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_MUL_ASSIGNMENT);
 				} else {
 					// ASTERISC
 					createSimpleToken(token, &ctx, ASTERISC);
 				}
 			} else if (state->c == '%') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Modulo Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_MODULO_ASSIGNMENT);
 				} else {
 					// Modulo Operator
 					createSimpleToken(token, &ctx, OPERATOR_MODULO);
 				}
 			} else if (state->c == '+') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Plus Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_PLUS_ASSIGNMENT);
 				} else if (state->c == '+') {
 					// PlusPlus Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_PLUSPLUS);
 				} else {
 					// Plus Operator
 					createSimpleToken(token, &ctx, OPERATOR_PLUS);
 				}
 			} else if (state->c == '-') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Minus Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_MINUS_ASSIGNMENT);
 				} else if (state->c == '-') {
 					// MinusMinus Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_MINUSMINUS);
 				} else if (state->c == '>') {
 					// Dereference Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_DEREFERENCE);
 				} else {
 					// Plus Operator
 					createSimpleToken(token, &ctx, OPERATOR_MINUS);
 				}
 			} else if (state->c == '&') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// And Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_AND_ASSIGNMENT);
 				} else if (state->c == '&') {
 					// Logical And Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_AND);
 				} else {
 					// And Operator
 					createSimpleToken(token, &ctx, OPERATOR_AND);
 				}
 			} else if (state->c == '|') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Or Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_OR_ASSIGNMENT);
 				} else if (state->c == '&') {
 					// Logical And Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_OR);
 				} else {
 					// Plus Operator
 					createSimpleToken(token, &ctx, OPERATOR_OR);
 				}
 			} else if (state->c == '^') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Xor Assignment Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_XOR_ASSIGNMENT);
 				} else {
 					// Plus Operator
 					createSimpleToken(token, &ctx, OPERATOR_XOR);
 				}
 			} else if (state->c == '~') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				// Negate Operator
 				createSimpleToken(token, &ctx, OPERATOR_NEGATE);
 			} else if (state->c == '!') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Not Equal Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_NOT_EQUAL);
 				} else {
 					// Logical Not Operator
 					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_NOT);
 				}
 			} else if (state->c == '<') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '<') {
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					if (state->c == '=') {
 						// Shift left Assignment Operator
-						state->column++;
-						consumeInput(state);
+						if (!consumeLexableChar(state)) {
+							return false;
+						}
 						createSimpleToken(token, &ctx,
 						                  OPERATOR_SHIFT_LEFT_ASSIGNMENT);
 					} else {
@@ -548,23 +605,27 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					}
 				} else if (state->c == '=') {
 					// Less or equal Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_LESS_OR_EQUAL);
 				} else {
 					// Less than Operator
 					createSimpleToken(token, &ctx, OPERATOR_LESS);
 				}
 			} else if (state->c == '>') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '>') {
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					if (state->c == '=') {
 						// Shift right Assignment Operator
-						state->column++;
-						consumeInput(state);
+						if (!consumeLexableChar(state)) {
+							return false;
+						}
 						createSimpleToken(token, &ctx,
 						                  OPERATOR_SHIFT_RIGHT_ASSIGNMENT);
 					} else {
@@ -573,68 +634,82 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					}
 				} else if (state->c == '=') {
 					// Greater or equal Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_GREATER_OR_EQUAL);
 				} else {
 					// Greater than Operator
 					createSimpleToken(token, &ctx, OPERATOR_GREATER);
 				}
 			} else if (state->c == '=') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == '=') {
 					// Equal Comparsion Operator
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					createSimpleToken(token, &ctx, OPERATOR_EQUAL);
 				} else {
 					// Assignment Operator
 					createSimpleToken(token, &ctx, OPERATOR_ASSIGNMENT);
 				}
 			} else if (state->c == '?') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, OPERATOR_CONDITIONAL);
 			} else if (state->c == ':') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, COLON);
 			} else if (state->c == ';') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, SEMICOLON);
 			} else if (state->c == ',') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, COMMA);
 			} else if (state->c == '(') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, PARENTHESE_LEFT);
 			} else if (state->c == ')') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, PARENTHESE_RIGHT);
 			} else if (state->c == '[') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, BRACKET_LEFT);
 			} else if (state->c == ']') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, BRACKET_RIGHT);
 			} else if (state->c == '{') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, BRACE_LEFT);
 			} else if (state->c == '}') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				createSimpleToken(token, &ctx, BRACE_RIGHT);
 			} else if (state->c == '.') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c >= '0' && state->c <= '9') {
 					lexFractionalNumber(state, token, &ctx);
 				} else {
@@ -646,11 +721,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				// Keyword or Identifier
 				success = lexWord(state, token, &ctx);
 			} else if (state->c == '0') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				if (state->c == 'x') {
-					state->column++;
-					consumeInput(state);
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
 					if ((state->c >= 'a' && state->c <= 'f') ||
 					    (state->c >= 'A' && state->c <= 'F') ||
 					    (state->c >= '0' && state->c <= '9')) {
