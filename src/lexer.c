@@ -378,12 +378,13 @@ static bool consumeLexableChar(struct LexerState* state)
 	bool success = true;
 	state->column++;
 	consumeInput(state);
-	if (state->c == '\\') {
+	while (state->c == '\\') {
 		state->column++;
 		consumeInput(state);
 		skipTabsAndSpaces(state);
 		if (state->c != '\n') {
 			success = false;
+			break;
 		} else {
 			state->column = 0;
 			state->line++;
