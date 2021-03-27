@@ -119,6 +119,7 @@ struct LexerToken {
 struct LexerState {
 	uint16_t line;
 	uint16_t column;
+	bool carriage_return;
 	char c;
 	int pos;
 	struct InputFile current_file;

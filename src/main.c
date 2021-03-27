@@ -14,8 +14,27 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 
 #include "lexer.h"
+
+inline static void setRedColor()
+{
+	if (isatty(STDERR_FILENO)) {
+		fprintf(stderr, "\e[31m");
+	}
+}
+
+inline static void resetColor()
+{
+	if (isatty(STDERR_FILENO)) {
+		fprintf(stderr, "\e[39m");
+	}
+}
+
+/*static void printErrorMessage(int line, int column, FILE* file) {
+
+}*/
 
 int main()
 {
@@ -29,8 +48,13 @@ int main()
 		struct LexerToken token;
 		validInput = getNextToken(&lexer_state, &token);
 		if (!validInput) {
-			printf("lexer error at line %d column %d\n", lexer_state.line + 1,
-			       lexer_state.column + 1);
+			setRedColor();
+			fprintf(stderr, "lexer error ");
+			resetColor();
+			int character = (int)lexer_state.c;
+			fprintf(stderr, "at %s:%d:%d unexpected character:%c (0x%X)\n",
+			        lexer_state.current_file.name, lexer_state.line + 1,
+			        lexer_state.column + 1, lexer_state.c, character);
 		} else {
 			printToken(&lexer_state, &token);
 		}
@@ -39,5 +63,6 @@ int main()
 			break;
 		}
 	}
+	// showPosition("A short text", 8);
 	return 0;
 }

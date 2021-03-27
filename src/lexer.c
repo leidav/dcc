@@ -9,6 +9,7 @@ struct FileContext {
 };
 
 static bool consumeLexableChar(struct LexerState* state);
+static bool skipBackslashNewline(struct LexerState* state);
 
 static const char* tokenNames[] = {
     "IDENTIFIER",
@@ -161,10 +162,19 @@ static const char* fileName(const char* path)
 
 static void consumeInput(struct LexerState* state)
 {
+	// support unix, dos and legacy mac text files
 	state->c = readChar(&state->current_file);
 	state->pos++;
+	if (state->c == '\r') {
+		state->carriage_return = true;
+		state->c = '\n';
+	} else if ((state->c == '\n') && state->carriage_return) {
+		state->carriage_return = false;
+		consumeInput(state);
+	} else {
+		state->carriage_return = false;
+	}
 }
-
 int initLexer(struct LexerState* state, const char* file_path)
 {
 	state->line = 0;
@@ -184,25 +194,23 @@ int initLexer(struct LexerState* state, const char* file_path)
 		return -1;
 	}
 	consumeInput(state);
+	state->carriage_return = false;
 	return 0;
 }
-
 static bool skipIfWhiteSpace(struct LexerState* state)
 {
 	bool isWhitespace;
 	if (state->c == '\n') {
 		state->column = 0;
 		state->line++;
-		isWhitespace = true;
 		consumeInput(state);
+		isWhitespace = true;
 	} else if (state->c == ' ' || state->c == '\t') {
 		state->column++;
-		isWhitespace = true;
 		consumeInput(state);
-	} else if (state->c == '\r') {
-		state->column = 0;
 		isWhitespace = true;
-		consumeInput(state);
+	} else if (state->c == '\\') {
+		isWhitespace = skipBackslashNewline(state);
 	} else {
 		isWhitespace = false;
 	}
@@ -214,25 +222,51 @@ static void skipWhiteSpaces(struct LexerState* state)
 	}
 }
 
-static void skipTabsAndSpaces(struct LexerState* state)
+static bool skipBackslashNewline(struct LexerState* state)
 {
-	while ((state->c == ' ') || (state->c == '\t')) {
+	bool success = true;
+	while (state->c == '\\') {
 		state->column++;
 		consumeInput(state);
+		while ((state->c == ' ') || (state->c == '\t')) {
+			state->column++;
+			consumeInput(state);
+		}
+		if (state->c == '\n') {
+			state->column = 0;
+			state->line++;
+			consumeInput(state);
+		} else {
+			success = false;
+			break;
+		}
 	}
+	return success;
+}
+
+static bool consumeLexableChar(struct LexerState* state)
+{
+	state->column++;
+	consumeInput(state);
+	return skipBackslashNewline(state);
 }
 
 static bool skipMultiLineComment(struct LexerState* state)
 {
 	bool success = true;
 	while (state->c != INPUT_EOF) {
-		skipIfWhiteSpace(state);
-		if (state->c == '*') {
-			state->column++;
+		if (state->c == '\n') {
+			state->column = 0;
+			state->line++;
 			consumeInput(state);
+		} else if (state->c == '*') {
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
 			if (state->c == '/') {
-				state->column++;
-				consumeInput(state);
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
 				break;
 			}
 		} else {
@@ -252,10 +286,8 @@ static void skipSingleLineComment(struct LexerState* state)
 		if (state->c == '\n') {
 			state->column = 0;
 			state->line++;
-			consumeInput(state);
+			skipBackslashNewline(state);
 			break;
-		} else if (state->c == '\r') {
-			state->line = 0;
 		}
 		consumeInput(state);
 	}
@@ -373,27 +405,6 @@ static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
 	return false;
 }
 
-static bool consumeLexableChar(struct LexerState* state)
-{
-	bool success = true;
-	state->column++;
-	consumeInput(state);
-	while (state->c == '\\') {
-		state->column++;
-		consumeInput(state);
-		skipTabsAndSpaces(state);
-		if (state->c != '\n') {
-			success = false;
-			break;
-		} else {
-			state->column = 0;
-			state->line++;
-			consumeInput(state);
-		}
-	}
-	return success;
-}
-
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
 	bool success = true;
@@ -409,19 +420,22 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 		} else {
 			if (state->c == '/') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '/') {
 					// Single Line Comment
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					skipSingleLineComment(state);
 					again = true;
 				} else if (state->c == '*') {
 					// Multi Line Comment
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					success = skipMultiLineComment(state);
 					if (success) {
@@ -430,7 +444,8 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				} else if (state->c == '=') {
 					// Divison Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_DIV_ASSIGNMENT);
 				} else {
@@ -439,12 +454,14 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '*') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Multiplication Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_MUL_ASSIGNMENT);
 				} else {
@@ -453,12 +470,14 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '%') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Modulo Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_MODULO_ASSIGNMENT);
 				} else {
@@ -467,18 +486,21 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '+') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Plus Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_PLUS_ASSIGNMENT);
 				} else if (state->c == '+') {
 					// PlusPlus Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_PLUSPLUS);
 				} else {
@@ -487,24 +509,28 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '-') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Minus Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_MINUS_ASSIGNMENT);
 				} else if (state->c == '-') {
 					// MinusMinus Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_MINUSMINUS);
 				} else if (state->c == '>') {
 					// Dereference Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_DEREFERENCE);
 				} else {
@@ -513,18 +539,21 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '&') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// And Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_AND_ASSIGNMENT);
 				} else if (state->c == '&') {
 					// Logical And Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_AND);
 				} else {
@@ -533,18 +562,21 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '|') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Or Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_OR_ASSIGNMENT);
 				} else if (state->c == '&') {
 					// Logical And Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_OR);
 				} else {
@@ -553,12 +585,14 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '^') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Xor Assignment Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_XOR_ASSIGNMENT);
 				} else {
@@ -567,18 +601,21 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '~') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				// Negate Operator
 				createSimpleToken(token, &ctx, OPERATOR_NEGATE);
 			} else if (state->c == '!') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Not Equal Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_NOT_EQUAL);
 				} else {
@@ -587,16 +624,19 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '<') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '<') {
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					if (state->c == '=') {
 						// Shift left Assignment Operator
 						if (!consumeLexableChar(state)) {
-							return false;
+							success = false;
+							break;
 						}
 						createSimpleToken(token, &ctx,
 						                  OPERATOR_SHIFT_LEFT_ASSIGNMENT);
@@ -607,7 +647,8 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				} else if (state->c == '=') {
 					// Less or equal Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_LESS_OR_EQUAL);
 				} else {
@@ -616,16 +657,19 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '>') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '>') {
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					if (state->c == '=') {
 						// Shift right Assignment Operator
 						if (!consumeLexableChar(state)) {
-							return false;
+							success = false;
+							break;
 						}
 						createSimpleToken(token, &ctx,
 						                  OPERATOR_SHIFT_RIGHT_ASSIGNMENT);
@@ -636,7 +680,8 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				} else if (state->c == '=') {
 					// Greater or equal Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_GREATER_OR_EQUAL);
 				} else {
@@ -645,12 +690,14 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '=') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == '=') {
 					// Equal Comparsion Operator
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					createSimpleToken(token, &ctx, OPERATOR_EQUAL);
 				} else {
@@ -659,57 +706,68 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 			} else if (state->c == '?') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, OPERATOR_CONDITIONAL);
 			} else if (state->c == ':') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, COLON);
 			} else if (state->c == ';') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, SEMICOLON);
 			} else if (state->c == ',') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, COMMA);
 			} else if (state->c == '(') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, PARENTHESE_LEFT);
 			} else if (state->c == ')') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, PARENTHESE_RIGHT);
 			} else if (state->c == '[') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, BRACKET_LEFT);
 			} else if (state->c == ']') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, BRACKET_RIGHT);
 			} else if (state->c == '{') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, BRACE_LEFT);
 			} else if (state->c == '}') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				createSimpleToken(token, &ctx, BRACE_RIGHT);
 			} else if (state->c == '.') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c >= '0' && state->c <= '9') {
 					lexFractionalNumber(state, token, &ctx);
@@ -723,11 +781,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				success = lexWord(state, token, &ctx);
 			} else if (state->c == '0') {
 				if (!consumeLexableChar(state)) {
-					return false;
+					success = false;
+					break;
 				}
 				if (state->c == 'x') {
 					if (!consumeLexableChar(state)) {
-						return false;
+						success = false;
+						break;
 					}
 					if ((state->c >= 'a' && state->c <= 'f') ||
 					    (state->c >= 'A' && state->c <= 'F') ||
@@ -759,10 +819,10 @@ void printToken(struct LexerState* state, struct LexerToken* token)
 	if (token->type == IDENTIFIER) {
 		int index = token->value.string_index;
 		printf("line:%d, column: %d, type: <IDENTIFIER>, id:%d, name: %s\n",
-		       token->line, token->column, index,
+		       token->line + 1, token->column + 1, index,
 		       getStringAt(&state->identifiers, index));
 	} else {
-		printf("line:%d, column: %d, type: <%s>\n", token->line, token->column,
-		       tokenNames[token->type]);
+		printf("line:%d, column: %d, type: <%s>\n", token->line + 1,
+		       token->column + 1, tokenNames[token->type]);
 	}
 }
