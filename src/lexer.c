@@ -2,7 +2,6 @@
 
 #include <stdbool.h>
 #include <string.h>
-
 struct FileContext {
 	int line;
 	int column;
@@ -123,18 +122,35 @@ static int createSimpleToken(struct LexerToken* token,
 
 static int createIntegerLiteralToken(struct LexerToken* token,
                                      const struct FileContext* ctx,
-                                     uint64_t number, bool isSigned)
+                                     uint64_t number, bool is_unsigned)
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
-	token->type = LITERAL_INT;
-	if (isSigned) {
-		token->value.int_literal = (int64_t)number;
+	if (is_unsigned) {
+		token->type = LITERAL_UNSIGNED_INT;
 	} else {
-		token->value.uint_literal = number;
+		token->type = LITERAL_INT;
+	}
+	token->value.int_literal = number;
+	return 0;
+}
+
+static int createFloatingpointLiteralToken(struct LexerToken* token,
+                                           const struct FileContext* ctx,
+                                           double number, bool is_float)
+{
+	token->line = ctx->line;
+	token->column = ctx->column;
+	if (is_float) {
+		token->type = LITERAL_FLOAT;
+		token->value.float_literal = (float)number;
+	} else {
+		token->type = LITERAL_DOUBLE;
+		token->value.double_literal = number;
 	}
 	return 0;
 }
+
 static int createIdentifierToken(struct LexerToken* token,
                                  const struct FileContext* ctx, uint16_t index)
 {
@@ -383,23 +399,218 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	}
 	return true;
 }
+static double exponential(int exponent)
+{
+	double number = 1.0;
+	double factor = 10.0;
+	if (exponent < 0) {
+		exponent = -exponent;
+		factor = 1.0 / 10.0;
+	}
+	for (int i = 0; i < exponent; i++) {
+		number *= factor;
+	}
+	return number;
+}
+
+static bool lexExponent(struct LexerState* state, int* exponent)
+{
+	int sign = 1;
+	if (state->c == '-') {
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		sign = -1;
+	}
+	if ((state->c < '0') && (state->c > '9')) {
+		return false;
+	}
+	int integer = (int)(state->c - '0');
+	if (!consumeLexableChar(state)) {
+		return false;
+	}
+	while ((state->c >= '0') && (state->c <= '9')) {
+		integer *= 10;
+		integer += (int)(state->c - '0');
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+	}
+	*exponent = integer * sign;
+	return true;
+}
+
+static bool lexFractionalNumber(struct LexerState* state,
+                                struct LexerToken* token,
+                                const struct FileContext* ctx,
+                                bool has_integer_part, double start)
+{
+	double num = 0.0;
+	double factor = 1.0;
+	int length = 0;
+	while ((state->c >= '0' && state->c <= '9')) {
+		num += (double)(state->c - '0');
+		num /= 10.0;
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		length++;
+	}
+	if ((!has_integer_part) && (length == 0)) {
+		return false;
+	}
+
+	if (state->c == 'e') {
+		if (length == 0) {
+			return false;
+		}
+		// exponent
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		int exponent;
+		if (!lexExponent(state, &exponent)) {
+			return -1;
+		}
+		factor = exponential(exponent);
+	}
+	bool is_float = false;
+	if (state->c == 'f') {
+		// float
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		is_float = true;
+	}
+	double floatingpoint = (start + num) * factor;
+	createFloatingpointLiteralToken(token, ctx, floatingpoint, is_float);
+	return true;
+}
 
 static bool lexNumber(struct LexerState* state, struct LexerToken* token,
                       const struct FileContext* ctx)
 {
-	// success=consumeLexableChar(state);
-	return false;
+	uint64_t integer = 0;
+	while ((state->c >= '0') && (state->c <= '9')) {
+		integer *= 10;
+		integer += (uint64_t)(state->c - '0');
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+	}
+	if (state->c == '.') {
+		// floating point
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		if (!lexFractionalNumber(state, token, ctx, true, (double)integer)) {
+			return false;
+		}
+	} else if (state->c == 'e') {
+		// floating point exponent
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		int exponent;
+		if (!lexExponent(state, &exponent)) {
+			return false;
+		}
+		double factor = exponential(exponent);
+		bool is_float = false;
+		if (state->c == 'f') {
+			// float
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			is_float = true;
+		}
+		double floatingpoint = integer * factor;
+		createFloatingpointLiteralToken(token, ctx, floatingpoint, is_float);
+	} else {
+		// integer
+		bool is_unsigned = false;
+		if ((state->c == 'u') || (state->c == 'U')) {
+			// unsigned
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			is_unsigned = true;
+
+			if (state->c == 'l') {
+				// long
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+				if (state->c == 'l') {
+					// long long
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
+				}
+			} else if (state->c == 'L') {
+				// long
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+				if (state->c == 'L') {
+					// long long
+					if (!consumeLexableChar(state)) {
+						return false;
+					}
+				}
+			}
+		}
+		if (state->c == 'l') {
+			// long
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			if (state->c == 'l') {
+				// long long
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+			}
+			if ((state->c == 'u') || (state->c == 'U')) {
+				// unsigned
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+				is_unsigned = true;
+			}
+		} else if (state->c == 'L') {
+			// long
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			if (state->c == 'L') {
+				// long long
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+			}
+			if ((state->c == 'u') || (state->c == 'U')) {
+				// unsigned
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+				is_unsigned = true;
+			}
+		}
+		createIntegerLiteralToken(token, ctx, integer, is_unsigned);
+	}
+	return true;
 }
-static bool lexFractionalNumber(struct LexerState* state,
-                                struct LexerToken* token,
-                                const struct FileContext* ctx)
+
+static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
+                         const struct FileContext* ctx)
 {
 	// success=consumeLexableChar(state);
 	return false;
 }
 
-static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
-                         const struct FileContext* ctx)
+static bool lexOctalNumber(struct LexerState* state, struct LexerToken* token,
+                           const struct FileContext* ctx)
 {
 	// success=consumeLexableChar(state);
 	return false;
@@ -770,7 +981,10 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					break;
 				}
 				if (state->c >= '0' && state->c <= '9') {
-					lexFractionalNumber(state, token, &ctx);
+					if (!lexFractionalNumber(state, token, &ctx, false, 0)) {
+						success = false;
+						break;
+					}
 				} else {
 					createSimpleToken(token, &ctx, OPERATOR_POINT);
 				}
@@ -784,7 +998,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					success = false;
 					break;
 				}
-				if (state->c == 'x') {
+				if (state->c == 'x' || state->c == 'X') {
 					if (!consumeLexableChar(state)) {
 						success = false;
 						break;
@@ -798,8 +1012,11 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 						// not a valid hex number
 						success = false;
 					}
+					/*} else if (state->c == 'b') {
+					    // binary number
+					 */
 				} else {
-					success = lexNumber(state, token, &ctx);
+					success = lexOctalNumber(state, token, &ctx);
 				}
 			} else if (state->c >= '1' && state->c <= '9') {
 				// number
@@ -821,6 +1038,19 @@ void printToken(struct LexerState* state, struct LexerToken* token)
 		printf("line:%d, column: %d, type: <IDENTIFIER>, id:%d, name: %s\n",
 		       token->line + 1, token->column + 1, index,
 		       getStringAt(&state->identifiers, index));
+	} else if ((token->type == LITERAL_INT) ||
+	           (token->type == LITERAL_UNSIGNED_INT)) {
+		uint64_t value = token->value.int_literal;
+		printf("line:%d, column: %d, type: <LITERAL_INT>, value: %u\n",
+		       token->line + 1, token->column + 1, value);
+	} else if (token->type == LITERAL_DOUBLE) {
+		double value = token->value.double_literal;
+		printf("line:%d, column: %d, type: <LITERAL_DOUBLE>, value: %f\n",
+		       token->line + 1, token->column + 1, value);
+	} else if (token->type == LITERAL_FLOAT) {
+		float value = token->value.float_literal;
+		printf("line:%d, column: %d, type: <LITERAL_FLOAT>, value: %f\n",
+		       token->line + 1, token->column + 1, value);
 	} else {
 		printf("line:%d, column: %d, type: <%s>\n", token->line + 1,
 		       token->column + 1, tokenNames[token->type]);
