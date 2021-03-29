@@ -421,6 +421,10 @@ static bool lexExponent(struct LexerState* state, int* exponent)
 			return false;
 		}
 		sign = -1;
+	} else if (state->c == '+') {
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
 	}
 	if ((state->c < '0') && (state->c > '9')) {
 		return false;
@@ -460,7 +464,7 @@ static bool lexFractionalNumber(struct LexerState* state,
 		return false;
 	}
 
-	if (state->c == 'e') {
+	if ((state->c == 'e') || (state->c == 'E')) {
 		if (length == 0) {
 			return false;
 		}
@@ -506,7 +510,7 @@ static bool lexNumber(struct LexerState* state, struct LexerToken* token,
 		if (!lexFractionalNumber(state, token, ctx, true, (double)integer)) {
 			return false;
 		}
-	} else if (state->c == 'e') {
+	} else if ((state->c == 'e') || (state->c == 'E')) {
 		// floating point exponent
 		if (!consumeLexableChar(state)) {
 			return false;
