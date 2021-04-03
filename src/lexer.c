@@ -2,6 +2,9 @@
 
 #include <stdbool.h>
 #include <string.h>
+
+#include "keyword_hashes.h"
+
 struct FileContext {
 	int line;
 	int column;
@@ -9,95 +12,6 @@ struct FileContext {
 
 static bool consumeLexableChar(struct LexerState* state);
 static bool skipBackslashNewline(struct LexerState* state);
-
-static const char* tokenNames[] = {
-    "IDENTIFIER",
-    /*keywords*/
-    "KEYWORD_IF",
-    "KEYWORD_ELSE",
-    "KEYWORD_WHILE",
-    "KEYOWRD_FOR",
-    "KEYWORD_DO",
-    "KEYWORD_SWITCH",
-    "KEYWORD_CASE",
-    "KEYWORD_BREAK",
-    "KEYWORD_STRUCT",
-    "KEYWORD_ENUM",
-    "KEYWORD_UNION",
-    "KEYWORD_TYPEDEF",
-    "KEYWORD_VOID",
-    "KEYWORD_CHAR",
-    "KEYWORD_SHORT",
-    "KEYWORD_INT",
-    "KEYWORD_FLOAT",
-    "KEYWORD_DOUBLE",
-    "KEYWORD_SIGNED",
-    "KEYWORD_UNSIGNED",
-    "KEYWORD_STATIC",
-    "KEYWORD_EXTERN",
-    "KEYWORD_CONST",
-    "KEYWORD_INLINE",
-    "KEYWORD_RETURN",
-    "KEYWORD_GOTO",
-    /*operators*/
-    "OPERATOR_PLUS",
-    "OPERATOR_MINUS",
-    "OPERATOR_DIV",
-    "OPERATOR_MODULO",
-    "OPERATOR_PLUSPLUS",
-    "OPERATOR_MINUSMINUS",
-    "OPERATOR_AND",
-    "OPERATOR_OR",
-    "OPERATOR_XOR",
-    "OPERATOR_SHIFT_LEFT",
-    "OPERATOR_SHIFT_RIGHT",
-    "OPERATOR_NEGATE",
-    "OPERATOR_LOGICAL_AND",
-    "OPERATOR_LOGICAL_OR",
-    "OPERATOR_LOGICAL_NOT",
-    "OPERATOR_EQUAL",
-    "OPERATOR_NOT_EQUAL",
-    "OPERATOR_LESS",
-    "OPERATOR_GREATER",
-    "OPERATOR_LESS_OR_EQUAL",
-    "OPERATOR_GREATER_OR_EQUAL",
-    "OPERATOR_ASSIGNMENT",
-    "OPERATOR_PLUS_ASSIGNMENT",
-    "OPERATOR_MINUS_ASSIGNMENT",
-    "OPERATOR_MUL_ASSIGNMENT",
-    "OPERATOR_DIV_ASSIGNMENT",
-    "OPERATOR_MODULO_ASSIGNMENT",
-    "OPERATOR_AND_ASSIGNMENT",
-    "OPERATOR_OR_ASSIGNMENT",
-    "OPERATOR_XOR_ASSIGNMENT",
-    "OPERATOR_SHIFT_LEFT_ASSIGNMENT",
-    "OPERATOR_SHIFT_RIGHT_ASSIGNMENT",
-    "OPERATOR_POINT",
-    "OPERATOR_DEREFERENCE",
-    "OPERATOR_CONDITIONAL",
-    /*other symbols*/
-    "PARENTHESE_LEFT",
-    "PARENTHESE_RIGHT",
-    "BRACKET_LEFT",
-    "BRACKET_RIGHT",
-    "BRACE_LEFT",
-    "BRACE_RIGHT",
-    "ASTERISC",
-    "COMMA",
-    "COLON",
-    "SEMICOLON",
-    /*literals*/
-    "LITERAL_STRING",
-    "LITERAL_CHAR",
-    "LITERAL_UNSIGNED_CHAR",
-    "LITERAL_INT",
-    "LITERAL_UNSIGNED_INT",
-    "LITERAL_FLOAT",
-    "LITERAL_DOUBLE",
-    // end of file
-    "TOKEN_EOF",
-    "TOKEN_UNKNOWN",
-};
 
 static void getFileContext(struct LexerState* state, struct FileContext* ctx)
 {
@@ -159,6 +73,274 @@ static int createIdentifierToken(struct LexerToken* token,
 	token->type = IDENTIFIER;
 	token->value.string_index = index;
 	return 0;
+}
+
+static bool matchKeyword(const char* buffer, uint32_t buffer_hash,
+                         const struct FileContext* ctx,
+                         struct LexerToken* token)
+{
+	switch (buffer_hash) {
+		case KEYWORD_HASH_AUTO:
+			if (strcmp("auto", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_AUTO);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_BREAK:
+			if (strcmp("break", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_BREAK);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_CASE:
+			if (strcmp("case", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_CASE);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_CHAR:
+			if (strcmp("char", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_CHAR);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_CONST:
+			if (strcmp("const", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_CONST);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_CONTINUE:
+			if (strcmp("continue", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_CONTINUE);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_DEFAULT:
+			if (strcmp("default", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_DEFAULT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_DO:
+			if (strcmp("do", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_DO);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_DOUBLE:
+			if (strcmp("double", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_DOUBLE);
+				return true;
+			}
+		case KEYWORD_HASH_ELSE:
+			if (strcmp("else", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_ELSE);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_ENUM:
+			if (strcmp("enum", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_ENUM);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_EXTERN:
+			if (strcmp("extern", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_EXTERN);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_FLOAT:
+			if (strcmp("float", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_FLOAT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_FOR:
+			if (strcmp("for", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_FOR);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_GOTO:
+			if (strcmp("goto", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_GOTO);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_IF:
+			if (strcmp("if", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_IF);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_INLINE:
+			if (strcmp("inline", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_INLINE);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_INT:
+			if (strcmp("int", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_INT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_LONG:
+			if (strcmp("long", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_LONG);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_REGISTER:
+			if (strcmp("register", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_REGISTER);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_RESTRICT:
+			if (strcmp("restrict", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_RESTRICT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_RETURN:
+			if (strcmp("return", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_RETURN);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_SHORT:
+			if (strcmp("short", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_SHORT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_SIGNED:
+			if (strcmp("signed", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_SIGNED);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_SIZEOF:
+			if (strcmp("sizeof", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_SIZEOF);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_STATIC:
+			if (strcmp("static", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_STATIC);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_STRUCT:
+			if (strcmp("struct", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_STRUCT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_SWITCH:
+			if (strcmp("switch", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_SWITCH);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_TYPEDEF:
+			if (strcmp("typedef", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_TYPEDEF);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_UNION:
+			if (strcmp("union", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_UNION);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_UNSIGNED:
+			if (strcmp("unsigned", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_UNSIGNED);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_VOID:
+			if (strcmp("void", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_VOID);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_VOLATILE:
+			if (strcmp("volatile", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_VOLATILE);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_WHILE:
+			if (strcmp("while", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_WHILE);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_ALIGNAS:
+			if (strcmp("_Alignas", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_ALIGNAS);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_ALIGNOF:
+			if (strcmp("_Alignof", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_ALIGNOF);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_BOOL:
+			if (strcmp("_Bool", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_BOOL);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_COMPLEX:
+			if (strcmp("_Complex", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_COMPLEX);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_GENERIC:
+			if (strcmp("_Generic", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_GENERIC);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_IMAGINARY:
+			if (strcmp("_Imaginary", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_IMAGINARY);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_NORETURN:
+			if (strcmp("_Noreturn", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_NORETURN);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_STATIC_ASSERT:
+			if (strcmp("_Static_assert", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_STATIC_ASSERT);
+				return true;
+			}
+			break;
+		case KEYWORD_HASH_CONSTEXPR:
+			if (strcmp("__constexpr", buffer) == 0) {
+				createSimpleToken(token, ctx, KEYWORD_CONSTEXPR);
+				return true;
+			}
+			break;
+		default:
+			break;
+	}
+	return false;
 }
 
 static const char* fileName(const char* path)
@@ -317,8 +499,9 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	while (state->c != INPUT_EOF) {
 		if (!((state->c >= 'A' && state->c <= 'Z') ||
 		      (state->c >= 'a' && state->c <= 'z') ||
-		      (state->c >= '0' && state->c <= '9') || (state->c == '_') ||
-		      (state->c == '$'))) {
+		      (state->c >= '0' && state->c <= '9') || (state->c == '_')
+		      //|| (state->c == '$'))) {
+		      )) {
 			break;
 		}
 		buffer[length] = state->c;
@@ -337,64 +520,10 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 		return false;
 	}
 	buffer[length] = 0;
-	if (strcmp("if", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_IF);
-	} else if (strcmp("else", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_ELSE);
-	} else if (strcmp("while", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_WHILE);
-	} else if (strcmp("for", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_FOR);
-	} else if (strcmp("do", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_DO);
-	} else if (strcmp("switch", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_SWITCH);
-	} else if (strcmp("case", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_CASE);
-	} else if (strcmp("break", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_BREAK);
-	} else if (strcmp("struct", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_STRUCT);
-	} else if (strcmp("enum", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_ENUM);
-	} else if (strcmp("union", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_UNION);
-	} else if (strcmp("typedef", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_TYPEDEF);
-	} else if (strcmp("void", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_VOID);
-	} else if (strcmp("char", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_CHAR);
-	} else if (strcmp("short", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_SHORT);
-	} else if (strcmp("int", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_INT);
-	} else if (strcmp("float", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_FLOAT);
-	} else if (strcmp("double", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_DOUBLE);
-	} else if (strcmp("double", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_DOUBLE);
-	} else if (strcmp("signed", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_SIGNED);
-	} else if (strcmp("unsigned", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_UNSIGNED);
-	} else if (strcmp("unsigned", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_UNSIGNED);
-	} else if (strcmp("static", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_STATIC);
-	} else if (strcmp("extern", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_EXTERN);
-	} else if (strcmp("const", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_CONST);
-	} else if (strcmp("inline", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_INLINE);
-	} else if (strcmp("return", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_RETURN);
-	} else if (strcmp("goto", buffer) == 0) {
-		createSimpleToken(token, ctx, KEYWORD_GOTO);
-	} else {
-		int string = addString(&state->identifiers, buffer, length);
+	uint32_t hash = hashString(buffer);
+	if (!matchKeyword(buffer, hash, ctx, token)) {
+		int string =
+		    addStringAndHash(&state->identifiers, buffer, length, hash);
 		createIdentifierToken(token, ctx, string);
 	}
 	return true;
@@ -1033,30 +1162,4 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 		}
 	}
 	return success;
-}
-
-void printToken(struct LexerState* state, struct LexerToken* token)
-{
-	if (token->type == IDENTIFIER) {
-		int index = token->value.string_index;
-		printf("line:%d, column: %d, type: <IDENTIFIER>, id:%d, name: %s\n",
-		       token->line + 1, token->column + 1, index,
-		       getStringAt(&state->identifiers, index));
-	} else if ((token->type == LITERAL_INT) ||
-	           (token->type == LITERAL_UNSIGNED_INT)) {
-		uint64_t value = token->value.int_literal;
-		printf("line:%d, column: %d, type: <LITERAL_INT>, value: %u\n",
-		       token->line + 1, token->column + 1, value);
-	} else if (token->type == LITERAL_DOUBLE) {
-		double value = token->value.double_literal;
-		printf("line:%d, column: %d, type: <LITERAL_DOUBLE>, value: %f\n",
-		       token->line + 1, token->column + 1, value);
-	} else if (token->type == LITERAL_FLOAT) {
-		float value = token->value.float_literal;
-		printf("line:%d, column: %d, type: <LITERAL_FLOAT>, value: %f\n",
-		       token->line + 1, token->column + 1, value);
-	} else {
-		printf("line:%d, column: %d, type: <%s>\n", token->line + 1,
-		       token->column + 1, tokenNames[token->type]);
-	}
 }

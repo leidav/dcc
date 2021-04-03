@@ -16,6 +16,47 @@ static uint32_t fnv1a(const char* string, int length)
 	return hash;
 }
 
+static uint32_t fnv1a_nullterminated(const char* string)
+{
+	uint32_t hash = 2166136261;
+	while (*string) {
+		hash ^= (int)*string;
+		hash *= 16777619;
+		string++;
+	}
+	return hash;
+}
+
+static uint32_t djb2(const char* string, int length)
+{
+	uint32_t hash = 5381;
+	for (int i = 0; i < length; i++) {
+		hash = ((hash << 5) + hash) ^ (int)*string;
+		string++;
+	}
+	return hash;
+}
+
+static uint32_t djb2_nullterminated(const char* string)
+{
+	uint32_t hash = 5381;
+	while (*string) {
+		hash = ((hash << 5) + hash) ^ (int)*string;
+		string++;
+	}
+	return hash;
+}
+
+uint32_t hashString(const char* string)
+{
+	return djb2_nullterminated(string);
+}
+
+uint32_t hashSubstring(const char* string, int length)
+{
+	return djb2(string, length);
+}
+
 static int createString(struct StringSetString* string, const char* str,
                         int length, struct LinearAllocator* string_allocator)
 {
@@ -88,9 +129,9 @@ int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
 	return 0;
 }
 
-int addString(struct StringSet* stringset, const char* string, int length)
+int addStringAndHash(struct StringSet* stringset, const char* string,
+                     int length, uint32_t hash)
 {
-	uint32_t hash = fnv1a(string, length);
 	for (int i = 0; i < stringset->num; i++) {
 		if (stringset->hashes[i] == hash) {
 			if (compareStrings(&stringset->strings[i], string, length,
@@ -108,6 +149,12 @@ int addString(struct StringSet* stringset, const char* string, int length)
 	             &stringset->string_allocator);
 
 	return index;
+}
+
+int addString(struct StringSet* stringset, const char* string, int length)
+{
+	uint32_t hash = fnv1a(string, length);
+	return addStringAndHash(stringset, string, length, hash);
 }
 
 const char* getStringAt(struct StringSet* stringset, int index)
