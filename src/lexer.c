@@ -528,18 +528,26 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	}
 	return true;
 }
+static const double exponent_lookup[] = {1e1,  1e2,  1e4, 1e8,
+                                         1e16, 1e32, 1e64
+
+};
 static double exponential(int exponent)
 {
-	double number = 1.0;
-	double factor = 10.0;
-	if (exponent < 0) {
-		exponent = -exponent;
-		factor = 1.0 / 10.0;
+	double factor = 1.0;
+	bool negative = exponent < 0 ? true : false;
+	int exp = negative ? -exponent : exponent;
+
+	for (int i = 0; i < 7; i++) {
+		if (exp & 0x1) {
+			factor *= exponent_lookup[i];
+		}
+		exp = exp >> 1;
 	}
-	for (int i = 0; i < exponent; i++) {
-		number *= factor;
+	if (negative) {
+		factor = 1.0 / factor;
 	}
-	return number;
+	return factor;
 }
 
 static bool lexExponent(struct LexerState* state, int* exponent)
