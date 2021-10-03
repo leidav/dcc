@@ -629,6 +629,83 @@ static bool lexFractionalNumber(struct LexerState* state,
 	return true;
 }
 
+static bool lexIntegerSuffix(struct LexerState* state, struct LexerToken* token,
+                             const struct FileContext* ctx, uint64_t integer)
+{
+	// integer
+	bool is_unsigned = false;
+	if ((state->c == 'u') || (state->c == 'U')) {
+		// unsigned
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		is_unsigned = true;
+
+		if (state->c == 'l') {
+			// long
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			if (state->c == 'l') {
+				// long long
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+			}
+		} else if (state->c == 'L') {
+			// long
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			if (state->c == 'L') {
+				// long long
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+			}
+		}
+	}
+	if (state->c == 'l') {
+		// long
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		if (state->c == 'l') {
+			// long long
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+		}
+		if ((state->c == 'u') || (state->c == 'U')) {
+			// unsigned
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			is_unsigned = true;
+		}
+	} else if (state->c == 'L') {
+		// long
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+		if (state->c == 'L') {
+			// long long
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+		}
+		if ((state->c == 'u') || (state->c == 'U')) {
+			// unsigned
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+			is_unsigned = true;
+		}
+	}
+	createIntegerLiteralToken(token, ctx, integer, is_unsigned);
+	return true;
+}
+
 static bool lexNumber(struct LexerState* state, struct LexerToken* token,
                       const struct FileContext* ctx)
 {
@@ -669,77 +746,9 @@ static bool lexNumber(struct LexerState* state, struct LexerToken* token,
 		double floatingpoint = integer * factor;
 		createFloatingpointLiteralToken(token, ctx, floatingpoint, is_float);
 	} else {
-		// integer
-		bool is_unsigned = false;
-		if ((state->c == 'u') || (state->c == 'U')) {
-			// unsigned
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
-			is_unsigned = true;
-
-			if (state->c == 'l') {
-				// long
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
-				if (state->c == 'l') {
-					// long long
-					if (!consumeLexableChar(state)) {
-						return false;
-					}
-				}
-			} else if (state->c == 'L') {
-				// long
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
-				if (state->c == 'L') {
-					// long long
-					if (!consumeLexableChar(state)) {
-						return false;
-					}
-				}
-			}
+		if (!lexIntegerSuffix(state, token, ctx, integer)) {
+			return false;
 		}
-		if (state->c == 'l') {
-			// long
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
-			if (state->c == 'l') {
-				// long long
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
-			}
-			if ((state->c == 'u') || (state->c == 'U')) {
-				// unsigned
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
-				is_unsigned = true;
-			}
-		} else if (state->c == 'L') {
-			// long
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
-			if (state->c == 'L') {
-				// long long
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
-			}
-			if ((state->c == 'u') || (state->c == 'U')) {
-				// unsigned
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
-				is_unsigned = true;
-			}
-		}
-		createIntegerLiteralToken(token, ctx, integer, is_unsigned);
 	}
 	return true;
 }
@@ -747,14 +756,54 @@ static bool lexNumber(struct LexerState* state, struct LexerToken* token,
 static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
                          const struct FileContext* ctx)
 {
-	// success=consumeLexableChar(state);
-	return false;
+	bool success = true;
+	uint64_t number = 0;
+	while ((state->c >= 'a' && state->c <= 'f') ||
+	       (state->c >= 'A' && state->c <= 'F') ||
+	       (state->c >= '0' && state->c <= '9')) {
+		number <<= 4;
+		if (state->c >= '0' && state->c <= '9') {
+			number += state->c - '0';
+		} else {
+			number += (state->c & 0xdf) - 'A' + 10;
+		}
+		consumeLexableChar(state);
+	}
+	if (!lexIntegerSuffix(state, token, ctx, number)) {
+		return false;
+	}
+	return success;
 }
 
 static bool lexOctalNumber(struct LexerState* state, struct LexerToken* token,
                            const struct FileContext* ctx)
 {
-	return false;
+	bool success = true;
+	uint64_t number = 0;
+	while (state->c >= '0' && state->c <= '7') {
+		number <<= 3;
+		number += state->c - '0';
+		consumeLexableChar(state);
+	}
+	if (!lexIntegerSuffix(state, token, ctx, number)) {
+		return false;
+	}
+	return success;
+}
+static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
+                            const struct FileContext* ctx)
+{
+	bool success = true;
+	uint64_t number = 0;
+	while (state->c == '0' || state->c == '1') {
+		number <<= 1;
+		number += state->c - '0';
+		consumeLexableChar(state);
+	}
+	if (!lexIntegerSuffix(state, token, ctx, number)) {
+		return false;
+	}
+	return success;
 }
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
@@ -1153,19 +1202,21 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 						// not a valid hex number
 						success = false;
 					}
-					/*} else if (state->c == 'b') {
-					    // binary number
-					 */
-				} else {
+				} else if (state->c == 'b') {
 					if (!consumeLexableChar(state)) {
 						success = false;
 						break;
 					}
-					if (state->c >= '1' && state->c <= '7') {
-						success = lexOctalNumber(state, token, &ctx);
+					if (state->c == '0' || state->c == '1') {
+						success = lexBinaryNumber(state, token, &ctx);
 					} else {
-						createIntegerLiteralToken(token, &ctx, 0, false);
+						success = false;
 					}
+
+				} else if (state->c >= '1' && state->c <= '7') {
+					success = lexOctalNumber(state, token, &ctx);
+				} else {
+					createIntegerLiteralToken(token, &ctx, 0, false);
 				}
 			} else if (state->c >= '1' && state->c <= '9') {
 				// number
