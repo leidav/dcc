@@ -380,7 +380,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	state->pos = 0;
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
-		fprintf(stderr, "could not open file\n");
+		fprintf(stderr, "Could not open file\n");
 		return -1;
 	}
 	if (createStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
@@ -484,6 +484,7 @@ static void skipSingleLineComment(struct LexerState* state)
 		if (state->c == '\n') {
 			state->column = 0;
 			state->line++;
+			consumeInput(state);
 			skipBackslashNewline(state);
 			break;
 		}
@@ -753,7 +754,6 @@ static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
 static bool lexOctalNumber(struct LexerState* state, struct LexerToken* token,
                            const struct FileContext* ctx)
 {
-	// success=consumeLexableChar(state);
 	return false;
 }
 
@@ -1157,7 +1157,15 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					    // binary number
 					 */
 				} else {
-					success = lexOctalNumber(state, token, &ctx);
+					if (!consumeLexableChar(state)) {
+						success = false;
+						break;
+					}
+					if (state->c >= '1' && state->c <= '7') {
+						success = lexOctalNumber(state, token, &ctx);
+					} else {
+						createIntegerLiteralToken(token, &ctx, 0, false);
+					}
 				}
 			} else if (state->c >= '1' && state->c <= '9') {
 				// number

@@ -36,11 +36,15 @@ inline static void resetColor()
 
 }*/
 
-int main()
+int main(int argc, const char** argv)
 {
+	if (argc < 2) {
+		fprintf(stderr, "No input file specified!\n");
+		return 1;
+	}
 	struct LexerState lexer_state;
-	if (initLexer(&lexer_state, "/home/david/projects/dcc/build/test.c") != 0) {
-		fprintf(stderr, "could not initialize lexer\n");
+	if (initLexer(&lexer_state, argv[1]) != 0) {
+		fprintf(stderr, "Could not initialize lexer\n");
 		return -1;
 	}
 	bool validInput = true;
@@ -49,10 +53,10 @@ int main()
 		validInput = getNextToken(&lexer_state, &token);
 		if (!validInput) {
 			setRedColor();
-			fprintf(stderr, "lexer error ");
+			fprintf(stderr, "Lexer error ");
 			resetColor();
 			int character = (int)lexer_state.c;
-			fprintf(stderr, "at %s:%d:%d unexpected character:%c (0x%X)\n",
+			fprintf(stderr, "At %s:%d:%d unexpected character:%c (0x%X)\n",
 			        lexer_state.current_file.name, lexer_state.line + 1,
 			        lexer_state.column + 1, lexer_state.c, character);
 		} else {
