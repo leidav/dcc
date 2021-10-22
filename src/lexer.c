@@ -75,6 +75,17 @@ static int createIdentifierToken(struct LexerToken* token,
 	return 0;
 }
 
+static int createStringLiteralToken(struct LexerToken* token,
+                                    const struct FileContext* ctx,
+                                    uint16_t index)
+{
+	token->line = ctx->line;
+	token->column = ctx->column;
+	token->type = LITERAL_STRING;
+	token->value.string_index = index;
+	return 0;
+}
+
 static bool matchKeyword(const char* buffer, uint32_t buffer_hash,
                          const struct FileContext* ctx,
                          struct LexerToken* token)
@@ -491,6 +502,119 @@ static void skipSingleLineComment(struct LexerState* state)
 		consumeInput(state);
 	}
 }
+static bool lexCharacter(int* c, struct LexerState* state,
+                         struct FileContext* ctx, bool inside_string)
+{
+	bool success = true;
+	if (state->c == '\\') {
+		state->column++;
+		consumeInput(state);
+		if (state->c >= '0' && state->c <= '7') {
+			*c = 0;
+			int i = 0;
+			while (state->c >= '0' && state->c <= '7') {
+				if (i >= 3) {
+					success = false;
+					break;
+				}
+				*c <<= 3;
+				*c += state->c - '0';
+				i++;
+			}
+		} else {
+			switch (state->c) {
+				case '\'':
+					*c = '\'';
+					break;
+				case '\"':
+					*c = '\"';
+					break;
+				case '?':
+					*c = 0x3f;
+					break;
+				case '\\':
+					*c = '\\';
+					break;
+				case 'a':
+					*c = 0x7;
+					break;
+				case 'b':
+					*c = 0x8;
+					break;
+				case 'f':
+					*c = 0xc;
+					break;
+				case 'n':
+					*c = 0xa;
+					break;
+				case 'r':
+					*c = 0xd;
+					break;
+				case 't':
+					*c = 0x9;
+					break;
+				case 'v':
+					*c = 0xb;
+					break;
+				case 'x':
+					state->column++;
+					consumeInput(state);
+					*c = 0;
+					int i = 0;
+					while (i < 2 && ((state->c >= 'a' && state->c <= 'f') ||
+					                 (state->c >= 'A' && state->c <= 'F') ||
+					                 (state->c >= '0' && state->c <= '9'))) {
+						*c <<= 4;
+						if (state->c >= '0' && state->c <= '9') {
+							*c += state->c - '0';
+						} else {
+							*c += (state->c & 0xdf) - 'A' + 10;
+						}
+						i++;
+						state->column++;
+						consumeInput(state);
+					}
+					break;
+			}
+			if (*c > 255) {
+				success = false;
+			}
+		}
+	} else if (!inside_string && state->c == '\'') {
+		success = false;
+	} else {
+		*c = state->c;
+	}
+	return success;
+}
+
+static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
+                             struct FileContext* ctx)
+{
+	char buffer[1024];
+	int length = 0;
+	while (state->c != '"') {
+		if (state->c == '\n') {
+			return false;
+		}
+		int c;
+		if (!lexCharacter(&c, state, ctx, true)) {
+			return false;
+		}
+		buffer[length] = (char)c;
+		consumeInput(state);
+		length++;
+	}
+	if (!consumeLexableChar(state)) {
+		return false;
+	}
+	int index = addString(&state->string_literals, buffer, length);
+	if (index == -1) {
+		return false;
+	}
+	createStringLiteralToken(token, ctx, index);
+	return true;
+}
 static bool lexWord(struct LexerState* state, struct LexerToken* token,
                     const struct FileContext* ctx)
 {
@@ -752,11 +876,9 @@ static bool lexNumber(struct LexerState* state, struct LexerToken* token,
 	}
 	return true;
 }
-
 static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
                          const struct FileContext* ctx)
 {
-	bool success = true;
 	uint64_t number = 0;
 	while ((state->c >= 'a' && state->c <= 'f') ||
 	       (state->c >= 'A' && state->c <= 'F') ||
@@ -767,43 +889,47 @@ static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
 		} else {
 			number += (state->c & 0xdf) - 'A' + 10;
 		}
-		consumeLexableChar(state);
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
 	}
 	if (!lexIntegerSuffix(state, token, ctx, number)) {
 		return false;
 	}
-	return success;
+	return true;
 }
 
 static bool lexOctalNumber(struct LexerState* state, struct LexerToken* token,
                            const struct FileContext* ctx)
 {
-	bool success = true;
 	uint64_t number = 0;
 	while (state->c >= '0' && state->c <= '7') {
 		number <<= 3;
 		number += state->c - '0';
-		consumeLexableChar(state);
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
 	}
 	if (!lexIntegerSuffix(state, token, ctx, number)) {
 		return false;
 	}
-	return success;
+	return true;
 }
 static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
                             const struct FileContext* ctx)
 {
-	bool success = true;
 	uint64_t number = 0;
 	while (state->c == '0' || state->c == '1') {
 		number <<= 1;
 		number += state->c - '0';
-		consumeLexableChar(state);
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
 	}
 	if (!lexIntegerSuffix(state, token, ctx, number)) {
 		return false;
 	}
-	return success;
+	return true;
 }
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
@@ -1165,6 +1291,9 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					break;
 				}
 				createSimpleToken(token, &ctx, BRACE_RIGHT);
+			} else if (state->c == '"') {
+				consumeInput(state);
+				success = lexStringLiteral(state, token, &ctx);
 			} else if (state->c == '.') {
 				if (!consumeLexableChar(state)) {
 					success = false;
@@ -1196,7 +1325,6 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					if ((state->c >= 'a' && state->c <= 'f') ||
 					    (state->c >= 'A' && state->c <= 'F') ||
 					    (state->c >= '0' && state->c <= '9')) {
-						// hexadecimal number
 						success = lexHexNumber(state, token, &ctx);
 					} else {
 						// not a valid hex number

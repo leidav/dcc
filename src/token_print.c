@@ -128,6 +128,11 @@ void printToken(struct LexerState* state, struct LexerToken* token)
 		printf("line:%d, column: %d, type: <IDENTIFIER>, id:%d, name: %s\n",
 		       token->line + 1, token->column + 1, index,
 		       getStringAt(&state->identifiers, index));
+	} else if (token->type == LITERAL_STRING) {
+		int index = token->value.string_index;
+		printf("line:%d, column: %d, type: <LITERAL_STRING>, id:%d, name: %s\n",
+		       token->line + 1, token->column + 1, index,
+		       getStringAt(&state->string_literals, index));
 	} else if ((token->type == LITERAL_INT) ||
 	           (token->type == LITERAL_UNSIGNED_INT)) {
 		uint64_t value = token->value.int_literal;
