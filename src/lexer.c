@@ -6,6 +6,9 @@
 #include "helper.h"
 #include "keyword_hashes.h"
 
+#define READ_BUFFER_SIZE 2048
+static char read_buffer[READ_BUFFER_SIZE];
+
 struct FileContext {
 	int line;
 	int column;
@@ -596,22 +599,21 @@ static bool lexEscapeSequence(int* c, struct LexerState* state,
 static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
                              struct FileContext* ctx)
 {
-	char buffer[1024];
 	int length = 0;
 	while (state->c != '"') {
-		if (state->c == '\n') {
+		if (length == READ_BUFFER_SIZE - 1 || state->c == INPUT_EOF ||
+		    state->c == '\n') {
 			return false;
-		}
-		if (state->c == '\\') {
+		} else if (state->c == '\\') {
 			state->column++;
 			consumeInput(state);
 			int c;
 			if (!lexEscapeSequence(&c, state, ctx)) {
 				return false;
 			}
-			buffer[length] = (char)c;
+			read_buffer[length] = (char)c;
 		} else {
-			buffer[length] = state->c;
+			read_buffer[length] = state->c;
 			state->column++;
 			consumeInput(state);
 		}
@@ -620,7 +622,8 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	if (!consumeLexableChar(state)) {
 		return false;
 	}
-	int index = addString(&state->string_literals, buffer, length);
+	read_buffer[length] = 0;
+	int index = addString(&state->string_literals, read_buffer, length);
 	if (index == -1) {
 		return false;
 	}
@@ -666,21 +669,20 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 static bool lexWord(struct LexerState* state, struct LexerToken* token,
                     const struct FileContext* ctx)
 {
-	char buffer[256];
 	int length = 0;
 	bool success = true;
 	while (state->c != INPUT_EOF) {
 		if (!isAlphaNumeric(state->c)) {
 			break;
 		}
-		buffer[length] = state->c;
+		read_buffer[length] = state->c;
 		if (!consumeLexableChar(state)) {
 			return false;
 		}
 		length++;
 
 		// identifier to long
-		if (length == 256) {
+		if (length == READ_BUFFER_SIZE - 1) {
 			success = false;
 			break;
 		}
@@ -688,11 +690,11 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	if (!success) {
 		return false;
 	}
-	buffer[length] = 0;
-	uint32_t hash = hashString(buffer);
-	if (!matchKeyword(buffer, hash, ctx, token)) {
+	read_buffer[length] = 0;
+	uint32_t hash = hashString(read_buffer);
+	if (!matchKeyword(read_buffer, hash, ctx, token)) {
 		int string =
-		    addStringAndHash(&state->identifiers, buffer, length, hash);
+		    addStringAndHash(&state->identifiers, read_buffer, length, hash);
 		createIdentifierToken(token, ctx, string);
 	}
 	return true;
