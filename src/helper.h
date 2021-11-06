@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+
 const static inline bool isDecimalDigit(char c)
 {
 	return c >= '0' && c <= '9';

@@ -14,8 +14,11 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
+#include "helper.h"
 #include "lexer.h"
 
 inline static void setRedColor()
@@ -38,10 +41,10 @@ inline static void resetColor()
 
 static void printErrorLine(int line_pos, int column, const char* file_path)
 {
-	char buff[256];
+	char buff[128];
 	FILE* file = fopen(file_path, "r");
 	fseek(file, line_pos, SEEK_SET);
-	int length = fread(buff, 1, 256, file);
+	int length = fread(buff, 1, 128, file);
 	fclose(file);
 
 	char* line = buff;
@@ -84,7 +87,14 @@ int main(int argc, const char** argv)
 			fprintf(stderr, "At %s:%d:%d unexpected character:%c (0x%X)\n",
 			        lexer_state.current_file.name, lexer_state.line + 1,
 			        lexer_state.column + 1, lexer_state.c, character);
-			if (lexer_state.column < 120) {
+
+			int max_length = 120;
+			if (isatty(STDOUT_FILENO)) {
+				struct winsize terminal_size;
+				ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size);
+				max_length = MIN(terminal_size.ws_col, 120);
+			}
+			if (lexer_state.column < max_length) {
 				printErrorLine(lexer_state.line_pos, lexer_state.column,
 				               argv[1]);
 			}

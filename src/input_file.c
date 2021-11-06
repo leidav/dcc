@@ -2,7 +2,7 @@
 
 #include <stdlib.h>
 
-#define MIN(x, y) ((x) < (y) ? (x) : (y))
+#include "helper.h"
 
 static size_t getFileSize(FILE* file)
 {
