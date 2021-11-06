@@ -9,6 +9,7 @@
 struct FileContext {
 	int line;
 	int column;
+	int line_pos;
 };
 
 static bool consumeLexableChar(struct LexerState* state);
@@ -18,12 +19,14 @@ static void getFileContext(struct LexerState* state, struct FileContext* ctx)
 {
 	ctx->line = state->line;
 	ctx->column = state->column;
+	ctx->line_pos = state->line_pos;
 }
 static void setFileContext(struct LexerState* state,
                            const struct FileContext* ctx)
 {
 	state->line = ctx->line;
 	state->column = ctx->column;
+	state->line_pos = ctx->line_pos;
 }
 
 static int createSimpleToken(struct LexerToken* token,
@@ -32,6 +35,7 @@ static int createSimpleToken(struct LexerToken* token,
 	token->line = ctx->line;
 	token->column = ctx->column;
 	token->type = type;
+	token->line_pos = ctx->line_pos;
 	return 0;
 }
 
@@ -41,6 +45,7 @@ static int createIntegerLiteralToken(struct LexerToken* token,
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
+	token->line_pos = ctx->line_pos;
 	if (is_unsigned) {
 		token->type = LITERAL_UNSIGNED_INT;
 	} else {
@@ -56,6 +61,7 @@ static int createFloatingpointLiteralToken(struct LexerToken* token,
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
+	token->line_pos = ctx->line_pos;
 	if (is_float) {
 		token->type = LITERAL_FLOAT;
 		token->value.float_literal = (float)number;
@@ -71,6 +77,7 @@ static int createIdentifierToken(struct LexerToken* token,
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
+	token->line_pos = ctx->line_pos;
 	token->type = IDENTIFIER;
 	token->value.string_index = index;
 	return 0;
@@ -82,6 +89,7 @@ static int createStringLiteralToken(struct LexerToken* token,
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
+	token->line_pos = ctx->line_pos;
 	token->type = LITERAL_STRING;
 	token->value.string_index = index;
 	return 0;
@@ -378,9 +386,12 @@ static void consumeInput(struct LexerState* state)
 	if (state->c == '\r') {
 		state->carriage_return = true;
 		state->c = '\n';
-	} else if ((state->c == '\n') && state->carriage_return) {
-		state->carriage_return = false;
-		consumeInput(state);
+	} else if (state->c == '\n') {
+		state->line_pos = state->pos;
+		if (state->carriage_return) {
+			state->carriage_return = false;
+			consumeInput(state);
+		}
 	} else {
 		state->carriage_return = false;
 	}
@@ -390,6 +401,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	state->line = 0;
 	state->column = 0;
 	state->pos = 0;
+	state->line_pos = 0;
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
 		fprintf(stderr, "Could not open file\n");

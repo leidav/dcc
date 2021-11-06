@@ -131,11 +131,13 @@ struct LexerToken {
 		float float_literal;
 		double double_literal;
 	} value;
+	uint16_t line_pos;
 };
 
 struct LexerState {
 	uint16_t line;
 	uint16_t column;
+	uint16_t line_pos;
 	bool carriage_return;
 	char c;
 	int pos;

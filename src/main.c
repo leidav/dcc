@@ -36,6 +36,31 @@ inline static void resetColor()
 
 }*/
 
+static void printErrorLine(int line_pos, int column, const char* file_path)
+{
+	char buff[256];
+	FILE* file = fopen(file_path, "r");
+	fseek(file, line_pos, SEEK_SET);
+	int length = fread(buff, 1, 256, file);
+	fclose(file);
+
+	char* line = buff;
+	int pos = 0;
+	char* ptr = line;
+	while ((pos < length - 1) && (*ptr != '\n') && (*ptr != '\r')) {
+		ptr++;
+		pos++;
+	}
+	line[pos] = 0;
+	fprintf(stderr, "%s\n", line);
+	for (int i = 0; i < column; i++) {
+		putc(' ', stderr);
+	}
+	setRedColor();
+	fprintf(stderr, "^\n");
+	resetColor();
+}
+
 int main(int argc, const char** argv)
 {
 	if (argc < 2) {
@@ -59,6 +84,10 @@ int main(int argc, const char** argv)
 			fprintf(stderr, "At %s:%d:%d unexpected character:%c (0x%X)\n",
 			        lexer_state.current_file.name, lexer_state.line + 1,
 			        lexer_state.column + 1, lexer_state.c, character);
+			if (lexer_state.column < 120) {
+				printErrorLine(lexer_state.line_pos, lexer_state.column,
+				               argv[1]);
+			}
 		} else {
 			printToken(&lexer_state, &token);
 		}
