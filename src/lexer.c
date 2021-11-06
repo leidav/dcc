@@ -502,88 +502,82 @@ static void skipSingleLineComment(struct LexerState* state)
 		consumeInput(state);
 	}
 }
-static bool lexCharacter(int* c, struct LexerState* state,
-                         struct FileContext* ctx, bool inside_string)
+static bool lexEscapeSequence(int* c, struct LexerState* state,
+                              struct FileContext* ctx)
 {
 	bool success = true;
-	if (state->c == '\\') {
-		state->column++;
-		consumeInput(state);
-		if (state->c >= '0' && state->c <= '7') {
-			*c = 0;
-			int i = 0;
-			while (state->c >= '0' && state->c <= '7') {
-				if (i >= 3) {
-					success = false;
-					break;
-				}
-				*c <<= 3;
-				*c += state->c - '0';
-				i++;
+	if (state->c >= '0' && state->c <= '7') {
+		*c = 0;
+		int i = 0;
+		while (state->c >= '0' && state->c <= '7') {
+			if (i >= 3) {
+				success = false;
+				break;
 			}
-		} else {
-			switch (state->c) {
-				case '\'':
-					*c = '\'';
-					break;
-				case '\"':
-					*c = '\"';
-					break;
-				case '?':
-					*c = 0x3f;
-					break;
-				case '\\':
-					*c = '\\';
-					break;
-				case 'a':
-					*c = 0x7;
-					break;
-				case 'b':
-					*c = 0x8;
-					break;
-				case 'f':
-					*c = 0xc;
-					break;
-				case 'n':
-					*c = 0xa;
-					break;
-				case 'r':
-					*c = 0xd;
-					break;
-				case 't':
-					*c = 0x9;
-					break;
-				case 'v':
-					*c = 0xb;
-					break;
-				case 'x':
+			*c <<= 3;
+			*c += state->c - '0';
+			i++;
+			state->column++;
+			consumeInput(state);
+		}
+	} else {
+		switch (state->c) {
+			case '\'':
+				*c = '\'';
+				break;
+			case '\"':
+				*c = '\"';
+				break;
+			case '?':
+				*c = 0x3f;
+				break;
+			case '\\':
+				*c = '\\';
+				break;
+			case 'a':
+				*c = 0x7;
+				break;
+			case 'b':
+				*c = 0x8;
+				break;
+			case 'f':
+				*c = 0xc;
+				break;
+			case 'n':
+				*c = 0xa;
+				break;
+			case 'r':
+				*c = 0xd;
+				break;
+			case 't':
+				*c = 0x9;
+				break;
+			case 'v':
+				*c = 0xb;
+				break;
+			case 'x':
+				state->column++;
+				consumeInput(state);
+				*c = 0;
+				int i = 0;
+				while ((state->c >= 'a' && state->c <= 'f') ||
+				       (state->c >= 'A' && state->c <= 'F') ||
+				       (state->c >= '0' && state->c <= '9')) {
+					*c <<= 4;
+					if (state->c >= '0' && state->c <= '9') {
+						*c += state->c - '0';
+					} else {
+						*c += (state->c & 0xdf) - 'A' + 10;
+					}
+					i++;
 					state->column++;
 					consumeInput(state);
-					*c = 0;
-					int i = 0;
-					while (i < 2 && ((state->c >= 'a' && state->c <= 'f') ||
-					                 (state->c >= 'A' && state->c <= 'F') ||
-					                 (state->c >= '0' && state->c <= '9'))) {
-						*c <<= 4;
-						if (state->c >= '0' && state->c <= '9') {
-							*c += state->c - '0';
-						} else {
-							*c += (state->c & 0xdf) - 'A' + 10;
-						}
-						i++;
-						state->column++;
-						consumeInput(state);
-					}
-					break;
-			}
-			if (*c > 255) {
-				success = false;
-			}
+				}
+				break;
 		}
-	} else if (!inside_string && state->c == '\'') {
-		success = false;
-	} else {
-		*c = state->c;
+		if (*c > 255) {
+			success = false;
+		}
 	}
 	return success;
 }
@@ -597,12 +591,19 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 		if (state->c == '\n') {
 			return false;
 		}
-		int c;
-		if (!lexCharacter(&c, state, ctx, true)) {
-			return false;
+		if (state->c == '\\') {
+			state->column++;
+			consumeInput(state);
+			int c;
+			if (!lexEscapeSequence(&c, state, ctx)) {
+				return false;
+			}
+			buffer[length] = (char)c;
+		} else {
+			buffer[length] = state->c;
+			state->column++;
+			consumeInput(state);
 		}
-		buffer[length] = (char)c;
-		consumeInput(state);
 		length++;
 	}
 	if (!consumeLexableChar(state)) {
@@ -615,6 +616,42 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	createStringLiteralToken(token, ctx, index);
 	return true;
 }
+
+/*static bool lexCharacterLiteral(struct LexerState* state,
+                                struct LexerToken* token,
+                                struct FileContext* ctx)
+{
+    char buffer[1024];
+    int length = 0;
+    while (state->c != '\'') {
+        if (state->c == '\n') {
+            return false;
+        }
+        if (state->c == '\\') {
+            int c;
+            state->column++;
+            consumeInput(state);
+            if (!lexEscapeSequence(&c, state, ctx)) {
+                return false;
+            }
+            buffer[length] = (char)c;
+        } else {
+            buffer[length] = state->c;
+            consumeInput(state);
+        }
+        length++;
+    }
+    if (!consumeLexableChar(state)) {
+        return false;
+    }
+    int index = addString(&state->string_literals, buffer, length);
+    if (index == -1) {
+        return false;
+    }
+    createStringLiteralToken(token, ctx, index);
+    return true;
+}*/
+
 static bool lexWord(struct LexerState* state, struct LexerToken* token,
                     const struct FileContext* ctx)
 {
@@ -1294,7 +1331,12 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			} else if (state->c == '"') {
 				consumeInput(state);
 				success = lexStringLiteral(state, token, &ctx);
-			} else if (state->c == '.') {
+			} /* else if (state->c == '\'') {
+			     consumeInput(state);
+			     success = lexCharacterLiteral(state, token, &ctx);
+
+			 }*/
+			else if (state->c == '.') {
 				if (!consumeLexableChar(state)) {
 					success = false;
 					break;
