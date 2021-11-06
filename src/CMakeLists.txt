@@ -1,5 +1,7 @@
 add_executable(dcc main.c)
 target_sources(dcc PRIVATE 
+               "${CMAKE_CURRENT_SOURCE_DIR}/helper.h" 
+               "${CMAKE_CURRENT_SOURCE_DIR}/helper.c" 
                "${CMAKE_CURRENT_SOURCE_DIR}/keyword_hashes.h" 
                "${CMAKE_CURRENT_SOURCE_DIR}/token_print.c" 
                "${CMAKE_CURRENT_SOURCE_DIR}/lexer.c" 

@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "helper.h"
 #include "keyword_hashes.h"
 
 struct FileContext {
@@ -506,10 +507,10 @@ static bool lexEscapeSequence(int* c, struct LexerState* state,
                               struct FileContext* ctx)
 {
 	bool success = true;
-	if (state->c >= '0' && state->c <= '7') {
+	if (isOctalDigit(state->c)) {
 		*c = 0;
 		int i = 0;
-		while (state->c >= '0' && state->c <= '7') {
+		while (isOctalDigit(state->c)) {
 			if (i >= 3) {
 				success = false;
 				break;
@@ -560,11 +561,9 @@ static bool lexEscapeSequence(int* c, struct LexerState* state,
 				consumeInput(state);
 				*c = 0;
 				int i = 0;
-				while ((state->c >= 'a' && state->c <= 'f') ||
-				       (state->c >= 'A' && state->c <= 'F') ||
-				       (state->c >= '0' && state->c <= '9')) {
+				while (isHexDigit(state->c)) {
 					*c <<= 4;
-					if (state->c >= '0' && state->c <= '9') {
+					if (isDecimalDigit(state->c)) {
 						*c += state->c - '0';
 					} else {
 						*c += (state->c & 0xdf) - 'A' + 10;
@@ -659,11 +658,7 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	int length = 0;
 	bool success = true;
 	while (state->c != INPUT_EOF) {
-		if (!((state->c >= 'A' && state->c <= 'Z') ||
-		      (state->c >= 'a' && state->c <= 'z') ||
-		      (state->c >= '0' && state->c <= '9') || (state->c == '_')
-		      //|| (state->c == '$'))) {
-		      )) {
+		if (!isAlphaNumeric(state->c)) {
 			break;
 		}
 		buffer[length] = state->c;
@@ -725,14 +720,14 @@ static bool lexExponent(struct LexerState* state, int* exponent)
 			return false;
 		}
 	}
-	if ((state->c < '0') && (state->c > '9')) {
+	if (!isDecimalDigit(state->c)) {
 		return false;
 	}
 	int integer = (int)(state->c - '0');
 	if (!consumeLexableChar(state)) {
 		return false;
 	}
-	while ((state->c >= '0') && (state->c <= '9')) {
+	while (isDecimalDigit(state->c)) {
 		integer *= 10;
 		integer += (int)(state->c - '0');
 		if (!consumeLexableChar(state)) {
@@ -751,7 +746,7 @@ static bool lexFractionalNumber(struct LexerState* state,
 	double num = 0.0;
 	double factor = 1.0;
 	int length = 0;
-	while ((state->c >= '0' && state->c <= '9')) {
+	while (isDecimalDigit(state->c)) {
 		num += (double)(state->c - '0');
 		num /= 10.0;
 		if (!consumeLexableChar(state)) {
@@ -871,7 +866,7 @@ static bool lexNumber(struct LexerState* state, struct LexerToken* token,
                       const struct FileContext* ctx)
 {
 	uint64_t integer = 0;
-	while ((state->c >= '0') && (state->c <= '9')) {
+	while (isDecimalDigit(state->c)) {
 		integer *= 10;
 		integer += (uint64_t)(state->c - '0');
 		if (!consumeLexableChar(state)) {
@@ -917,11 +912,9 @@ static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
                          const struct FileContext* ctx)
 {
 	uint64_t number = 0;
-	while ((state->c >= 'a' && state->c <= 'f') ||
-	       (state->c >= 'A' && state->c <= 'F') ||
-	       (state->c >= '0' && state->c <= '9')) {
+	while (isHexDigit(state->c)) {
 		number <<= 4;
-		if (state->c >= '0' && state->c <= '9') {
+		if (isDecimalDigit(state->c)) {
 			number += state->c - '0';
 		} else {
 			number += (state->c & 0xdf) - 'A' + 10;
@@ -940,7 +933,7 @@ static bool lexOctalNumber(struct LexerState* state, struct LexerToken* token,
                            const struct FileContext* ctx)
 {
 	uint64_t number = 0;
-	while (state->c >= '0' && state->c <= '7') {
+	while (isOctalDigit(state->c)) {
 		number <<= 3;
 		number += state->c - '0';
 		if (!consumeLexableChar(state)) {
@@ -956,7 +949,7 @@ static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
                             const struct FileContext* ctx)
 {
 	uint64_t number = 0;
-	while (state->c == '0' || state->c == '1') {
+	while (isBinaryDigit(state->c)) {
 		number <<= 1;
 		number += state->c - '0';
 		if (!consumeLexableChar(state)) {
@@ -1341,7 +1334,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					success = false;
 					break;
 				}
-				if (state->c >= '0' && state->c <= '9') {
+				if (isDecimalDigit(state->c)) {
 					if (!lexFractionalNumber(state, token, &ctx, false, 0)) {
 						success = false;
 						break;
@@ -1349,9 +1342,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				} else {
 					createSimpleToken(token, &ctx, OPERATOR_POINT);
 				}
-			} else if ((state->c >= 'A' && state->c <= 'Z') ||
-			           (state->c >= 'a' && state->c <= 'z') ||
-			           (state->c == '_')) {
+			} else if (isAlphabetic(state->c)) {
 				// Keyword or Identifier
 				success = lexWord(state, token, &ctx);
 			} else if (state->c == '0') {
@@ -1364,9 +1355,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 						success = false;
 						break;
 					}
-					if ((state->c >= 'a' && state->c <= 'f') ||
-					    (state->c >= 'A' && state->c <= 'F') ||
-					    (state->c >= '0' && state->c <= '9')) {
+					if (isHexDigit(state->c)) {
 						success = lexHexNumber(state, token, &ctx);
 					} else {
 						// not a valid hex number
@@ -1377,7 +1366,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 						success = false;
 						break;
 					}
-					if (state->c == '0' || state->c == '1') {
+					if (isBinaryDigit(state->c)) {
 						success = lexBinaryNumber(state, token, &ctx);
 					} else {
 						success = false;
