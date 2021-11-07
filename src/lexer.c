@@ -518,8 +518,8 @@ static void skipSingleLineComment(struct LexerState* state)
 		consumeInput(state);
 	}
 }
-static bool lexEscapeSequence(int* c, struct LexerState* state,
-                              struct FileContext* ctx)
+static void skipWhiteSpaceAndComments(struct LexerState* state) {}
+static bool lexEscapeSequence(int* c, struct LexerState* state)
 {
 	bool success = true;
 	if (isOctalDigit(state->c)) {
@@ -595,31 +595,39 @@ static bool lexEscapeSequence(int* c, struct LexerState* state,
 	}
 	return success;
 }
-
-static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
-                             struct FileContext* ctx)
+static int lexStringLiteralPiece(struct LexerState* state)
 {
 	int length = 0;
 	while (state->c != '"') {
 		if (length == READ_BUFFER_SIZE - 1 || state->c == INPUT_EOF ||
 		    state->c == '\n') {
-			return false;
+			return -1;
 		} else if (state->c == '\\') {
-			state->column++;
-			consumeInput(state);
-			int c;
-			if (!lexEscapeSequence(&c, state, ctx)) {
-				return false;
+			if (!skipBackslashNewline(state)) {
+				int c;
+				if (!lexEscapeSequence(&c, state)) {
+					return -1;
+				}
+				read_buffer[length] = (char)c;
+				length++;
 			}
-			read_buffer[length] = (char)c;
 		} else {
 			read_buffer[length] = state->c;
 			state->column++;
 			consumeInput(state);
+			length++;
 		}
-		length++;
 	}
 	if (!consumeLexableChar(state)) {
+		return -1;
+	}
+	return length;
+}
+static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
+                             struct FileContext* ctx)
+{
+	int length = lexStringLiteralPiece(state);
+	if (length < 0) {
 		return false;
 	}
 	read_buffer[length] = 0;
