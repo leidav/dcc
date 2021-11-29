@@ -139,6 +139,7 @@ struct LexerState {
 	uint16_t column;
 	uint16_t line_pos;
 	bool carriage_return;
+	bool line_beginning;
 	char c;
 	int pos;
 	struct InputFile current_file;

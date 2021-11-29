@@ -416,6 +416,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	state->column = 0;
 	state->pos = 0;
 	state->line_pos = 0;
+	state->line_beginning = true;
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
 		fprintf(stderr, "Could not open file\n");
@@ -439,6 +440,7 @@ static bool skipIfWhiteSpace(struct LexerState* state)
 	if (state->c == '\n') {
 		state->column = 0;
 		state->line++;
+		state->line_beginning = true;
 		consumeInput(state);
 		isWhitespace = true;
 	} else if (state->c == ' ' || state->c == '\t') {
@@ -1030,7 +1032,21 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			getFileContext(state, &ctx);
 			createSimpleToken(token, &ctx, TOKEN_EOF);
 		} else {
-			if (state->c == '/') {
+			if (state->c == '#') {
+				// preprocessor
+				if (!state->line_beginning) {
+					success = false;
+					break;
+				}
+				while (state->c != '\n') {
+					// skip preprocessor lines
+					if (!consumeLexableChar(state)) {
+						success = false;
+						break;
+					}
+				}
+				again = true;
+			} else if (state->c == '/') {
 				if (!consumeLexableChar(state)) {
 					success = false;
 					break;
@@ -1441,5 +1457,6 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			}
 		}
 	}
+	state->line_beginning = false;
 	return success;
 }
