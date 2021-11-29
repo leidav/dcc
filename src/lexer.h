@@ -126,7 +126,7 @@ struct LexerToken {
 	enum TokenType type;
 	union {
 		uint16_t string_index;
-		char character_literal;
+		int character_literal;
 		uint64_t int_literal;
 		float float_literal;
 		double double_literal;

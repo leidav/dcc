@@ -146,6 +146,11 @@ void printToken(struct LexerState* state, struct LexerToken* token)
 		float value = token->value.float_literal;
 		printf("line:%d, column: %d, type: <LITERAL_FLOAT>, value: %f\n",
 		       token->line + 1, token->column + 1, value);
+	} else if (token->type == LITERAL_CHAR) {
+		int value = token->value.character_literal;
+		printf(
+		    "line:%d, column: %d, type: <LITERAL_CHAR>, value: \'%c\' (%d)\n",
+		    token->line + 1, token->column + 1, value, value);
 	} else {
 		printf("line:%d, column: %d, type: <%s>\n", token->line + 1,
 		       token->column + 1, getTokenName(token->type));
