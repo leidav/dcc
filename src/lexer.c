@@ -609,6 +609,10 @@ static bool lexEscapeSequence(int* c, struct LexerState* state)
 			case 'v':
 				*c = 0xb;
 				break;
+				// non standard
+			case 'e':
+				*c = 0x1b;
+				break;
 			case 'x':
 				state->column++;
 				consumeInput(state);
