@@ -106,6 +106,9 @@ int main(int argc, const char** argv)
 			break;
 		}
 	}
+	/*for (int i = 0; i < lexer_state.identifiers.num; i++) {
+	    printf("%d, %s\n", i, getStringAt(&lexer_state.identifiers, i));
+	}*/
 	// showPosition("A short text", 8);
 	return 0;
 }
