@@ -401,7 +401,7 @@ static void consumeInput(struct LexerState* state)
 		state->carriage_return = true;
 		state->c = '\n';
 	} else if (state->c == '\n') {
-		state->line_pos = state->pos;
+		state->next_line_pos = state->pos;
 		if (state->carriage_return) {
 			state->carriage_return = false;
 			consumeInput(state);
@@ -416,6 +416,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	state->column = 0;
 	state->pos = 0;
 	state->line_pos = 0;
+	state->next_line_pos = 0;
 	state->line_beginning = true;
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
@@ -1024,6 +1025,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 	bool success = true;
 	bool again = true;
 	while (again) {
+		state->line_pos = state->next_line_pos;
 		again = false;
 		struct FileContext ctx;
 		skipWhiteSpaces(state);
