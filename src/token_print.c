@@ -106,12 +106,12 @@ static const char* getTokenName(enum TokenType type)
 		RETURN_AS_STRING_IF_MATCH(SEMICOLON)
 		/*literals*/
 		RETURN_AS_STRING_IF_MATCH(LITERAL_STRING)
-		RETURN_AS_STRING_IF_MATCH(LITERAL_CHAR)
-		RETURN_AS_STRING_IF_MATCH(LITERAL_UNSIGNED_CHAR)
-		RETURN_AS_STRING_IF_MATCH(LITERAL_INT)
-		RETURN_AS_STRING_IF_MATCH(LITERAL_UNSIGNED_INT)
-		RETURN_AS_STRING_IF_MATCH(LITERAL_FLOAT)
-		RETURN_AS_STRING_IF_MATCH(LITERAL_DOUBLE)
+		RETURN_AS_STRING_IF_MATCH(CONSTANT_CHAR)
+		RETURN_AS_STRING_IF_MATCH(CONSTANT_UNSIGNED_CHAR)
+		RETURN_AS_STRING_IF_MATCH(CONSTANT_INT)
+		RETURN_AS_STRING_IF_MATCH(CONSTANT_UNSIGNED_INT)
+		RETURN_AS_STRING_IF_MATCH(CONSTANT_FLOAT)
+		RETURN_AS_STRING_IF_MATCH(CONSTANT_DOUBLE)
 		// end of file
 		RETURN_AS_STRING_IF_MATCH(TOKEN_EOF)
 		RETURN_AS_STRING_IF_MATCH(TOKEN_UNKNOWN)
@@ -133,20 +133,20 @@ void printToken(struct LexerState* state, struct LexerToken* token)
 		printf("line:%d, column: %d, type: <LITERAL_STRING>, id:%d, name: %s\n",
 		       token->line + 1, token->column + 1, index,
 		       getStringAt(&state->string_literals, index));
-	} else if ((token->type == LITERAL_INT) ||
-	           (token->type == LITERAL_UNSIGNED_INT)) {
+	} else if ((token->type == CONSTANT_INT) ||
+	           (token->type == CONSTANT_UNSIGNED_INT)) {
 		uint64_t value = token->value.int_literal;
 		printf("line:%d, column: %d, type: <LITERAL_INT>, value: %llu\n",
 		       token->line + 1, token->column + 1, value);
-	} else if (token->type == LITERAL_DOUBLE) {
+	} else if (token->type == CONSTANT_DOUBLE) {
 		double value = token->value.double_literal;
 		printf("line:%d, column: %d, type: <LITERAL_DOUBLE>, value: %f\n",
 		       token->line + 1, token->column + 1, value);
-	} else if (token->type == LITERAL_FLOAT) {
+	} else if (token->type == CONSTANT_FLOAT) {
 		float value = token->value.float_literal;
 		printf("line:%d, column: %d, type: <LITERAL_FLOAT>, value: %f\n",
 		       token->line + 1, token->column + 1, value);
-	} else if (token->type == LITERAL_CHAR) {
+	} else if (token->type == CONSTANT_CHAR) {
 		int value = token->value.character_literal;
 		printf(
 		    "line:%d, column: %d, type: <LITERAL_CHAR>, value: \'%c\' (%d)\n",

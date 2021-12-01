@@ -42,34 +42,34 @@ static int createSimpleToken(struct LexerToken* token,
 	return 0;
 }
 
-static int createIntegerLiteralToken(struct LexerToken* token,
-                                     const struct FileContext* ctx,
-                                     uint64_t number, bool is_unsigned)
+static int createIntegerConstantToken(struct LexerToken* token,
+                                      const struct FileContext* ctx,
+                                      uint64_t number, bool is_unsigned)
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
 	token->line_pos = ctx->line_pos;
 	if (is_unsigned) {
-		token->type = LITERAL_UNSIGNED_INT;
+		token->type = CONSTANT_UNSIGNED_INT;
 	} else {
-		token->type = LITERAL_INT;
+		token->type = CONSTANT_INT;
 	}
 	token->value.int_literal = number;
 	return 0;
 }
 
-static int createFloatingpointLiteralToken(struct LexerToken* token,
-                                           const struct FileContext* ctx,
-                                           double number, bool is_float)
+static int createFloatingpointConstantToken(struct LexerToken* token,
+                                            const struct FileContext* ctx,
+                                            double number, bool is_float)
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
 	token->line_pos = ctx->line_pos;
 	if (is_float) {
-		token->type = LITERAL_FLOAT;
+		token->type = CONSTANT_FLOAT;
 		token->value.float_literal = (float)number;
 	} else {
-		token->type = LITERAL_DOUBLE;
+		token->type = CONSTANT_DOUBLE;
 		token->value.double_literal = number;
 	}
 	return 0;
@@ -86,9 +86,9 @@ static int createIdentifierToken(struct LexerToken* token,
 	return 0;
 }
 
-static int createStringLiteralToken(struct LexerToken* token,
-                                    const struct FileContext* ctx,
-                                    uint16_t index)
+static int createStringConstantToken(struct LexerToken* token,
+                                     const struct FileContext* ctx,
+                                     uint16_t index)
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
@@ -97,14 +97,14 @@ static int createStringLiteralToken(struct LexerToken* token,
 	token->value.string_index = index;
 	return 0;
 }
-static int createCharacterLiteralToken(struct LexerToken* token,
-                                       const struct FileContext* ctx,
-                                       int character)
+static int createCharacterConstantToken(struct LexerToken* token,
+                                        const struct FileContext* ctx,
+                                        int character)
 {
 	token->line = ctx->line;
 	token->column = ctx->column;
 	token->line_pos = ctx->line_pos;
-	token->type = LITERAL_CHAR;
+	token->type = CONSTANT_CHAR;
 	token->value.character_literal = character;
 	return 0;
 }
@@ -678,7 +678,7 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	if (index == -1) {
 		return false;
 	}
-	createStringLiteralToken(token, ctx, index);
+	createStringConstantToken(token, ctx, index);
 	return true;
 }
 
@@ -710,7 +710,7 @@ static bool lexCharacterLiteral(struct LexerState* state,
 	if (!consumeLexableChar(state)) {
 		return -1;
 	}
-	createCharacterLiteralToken(token, ctx, character);
+	createCharacterConstantToken(token, ctx, character);
 	return true;
 }
 
@@ -843,7 +843,7 @@ static bool lexFractionalNumber(struct LexerState* state,
 		is_float = true;
 	}
 	double floatingpoint = (start + num) * factor;
-	createFloatingpointLiteralToken(token, ctx, floatingpoint, is_float);
+	createFloatingpointConstantToken(token, ctx, floatingpoint, is_float);
 	return true;
 }
 
@@ -920,7 +920,7 @@ static bool lexIntegerSuffix(struct LexerState* state, struct LexerToken* token,
 			is_unsigned = true;
 		}
 	}
-	createIntegerLiteralToken(token, ctx, integer, is_unsigned);
+	createIntegerConstantToken(token, ctx, integer, is_unsigned);
 	return true;
 }
 
@@ -962,7 +962,7 @@ static bool lexNumber(struct LexerState* state, struct LexerToken* token,
 			is_float = true;
 		}
 		double floatingpoint = integer * factor;
-		createFloatingpointLiteralToken(token, ctx, floatingpoint, is_float);
+		createFloatingpointConstantToken(token, ctx, floatingpoint, is_float);
 	} else {
 		if (!lexIntegerSuffix(state, token, ctx, integer)) {
 			return false;
@@ -1451,7 +1451,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				} else if (state->c >= '1' && state->c <= '7') {
 					success = lexOctalNumber(state, token, &ctx);
 				} else {
-					createIntegerLiteralToken(token, &ctx, 0, false);
+					createIntegerConstantToken(token, &ctx, 0, false);
 				}
 			} else if (state->c >= '1' && state->c <= '9') {
 				// number
