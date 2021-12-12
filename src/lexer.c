@@ -497,11 +497,32 @@ static bool skipBackslashNewline(struct LexerState* state)
 	}
 	return success;
 }
+static bool skipBackslashNewlineLookahead(struct LexerState* state)
+{
+	bool success = true;
+	while (state->lookahead == '\\') {
+		state->lookahead_pos.column++;
+		readInputAndHandleLineEndings(state);
+		while ((state->lookahead == ' ') || (state->lookahead == '\t')) {
+			state->lookahead_pos.column++;
+			readInputAndHandleLineEndings(state);
+		}
+		if (state->lookahead == '\n') {
+			state->lookahead_pos.column = 0;
+			state->lookahead_pos.line++;
+			readInputAndHandleLineEndings(state);
+		} else {
+			success = false;
+			break;
+		}
+	}
+	return success;
+}
 
 static bool consumeLexableChar(struct LexerState* state)
 {
 	consumeInput(state);
-	return skipBackslashNewline(state);
+	return skipBackslashNewlineLookahead(state);
 }
 
 static bool skipMultiLineComment(struct LexerState* state)
