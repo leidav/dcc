@@ -95,6 +95,7 @@ int main(int argc, const char** argv)
 				max_length = MIN(terminal_size.ws_col, 120);
 			}
 			if (lexer_state.column < max_length) {
+				printf("%d\n", lexer_state.line_pos);
 				printErrorLine(lexer_state.line_pos, lexer_state.column,
 				               argv[1]);
 			}

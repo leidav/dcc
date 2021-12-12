@@ -14,6 +14,19 @@
 #define LEXER_MAX_IDENTIFIER_COUNT 1024
 #define LEXER_MAX_STRING_LITERAL_COUNT 1024
 
+enum LexerResult {
+	LEXER_RESULT_SUCCESS = 0,
+	LEXER_RESULT_NO_MATCH = 1,
+	LEXER_RESULT_FAIL = -1,
+};
+struct LexerErrorState {
+	uint16_t line;
+	uint16_t column;
+	int line_pos;
+	const char* error_message;
+	const struct InputFile* file;
+};
+
 enum TokenType {
 	IDENTIFIER = 0,
 	/*keywords*/
@@ -116,14 +129,13 @@ enum TokenType {
 	CONSTANT_UNSIGNED_INT,
 	CONSTANT_FLOAT,
 	CONSTANT_DOUBLE,
+	// Preprocessor
+	PP_NUMBER,
 	// other
 	TOKEN_EOF,
 	TOKEN_UNKNOWN,
 };
 struct LexerToken {
-	uint16_t line;
-	uint16_t column;
-	enum TokenType type;
 	union {
 		uint16_t string_index;
 		int character_literal;
@@ -131,7 +143,31 @@ struct LexerToken {
 		float float_literal;
 		double double_literal;
 	} value;
+	uint16_t line;
+	uint16_t column;
 	uint16_t line_pos;
+	uint8_t type;
+};
+struct LexerStoredToken {
+	uint16_t line;
+	uint16_t column;
+	uint16_t value_handle;
+	uint16_t line_pos;
+	uint8_t type;
+};
+struct LexerConstant {
+	union {
+		uint16_t string_index;
+		int character_literal;
+		uint64_t int_literal;
+		float float_literal;
+		double double_literal;
+	} value;
+};
+struct LexerConstantSet {
+	int num;
+	int max_num;
+	struct LexerConstant* constants;
 };
 
 struct LexerState {
@@ -140,12 +176,15 @@ struct LexerState {
 	int line_pos;
 	int next_line_pos;
 	int pos;
+	int lookahead_pos;
 	bool carriage_return;
 	bool line_beginning;
 	char c;
+	char lookahead;
 	struct InputFile current_file;
 	struct StringSet identifiers;
 	struct StringSet string_literals;
+	struct LexerConstantSet constants;
 };
 
 int initLexer(struct LexerState* state, const char* file_path);

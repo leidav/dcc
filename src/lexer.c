@@ -392,29 +392,47 @@ static const char* fileName(const char* path)
 	return &path[last_seperator + 1];
 }
 
-static void consumeInput(struct LexerState* state)
+static void readInputAndHandleLineEndings(struct LexerState* state)
 {
 	// support unix, dos and legacy mac text files
-	state->c = readChar(&state->current_file);
-	state->pos++;
-	if (state->c == '\r') {
-		state->carriage_return = true;
-		state->c = '\n';
-	} else if (state->c == '\n') {
-		state->next_line_pos = state->pos;
-		if (state->carriage_return) {
+	char next = readChar(&state->current_file);
+	state->lookahead_pos++;
+	switch (next) {
+		case '\r':
+			state->next_line_pos = state->lookahead_pos;
+			state->carriage_return = true;
+			next = '\n';
+			break;
+		case '\n':
+			state->next_line_pos = state->lookahead_pos;
+			if (state->carriage_return) {
+				next = readChar(&state->current_file);
+				state->lookahead_pos++;
+				if (next == '\r') {
+					next = '\n';
+				} else {
+					state->carriage_return = false;
+				}
+			}
+			break;
+		default:
 			state->carriage_return = false;
-			consumeInput(state);
-		}
-	} else {
-		state->carriage_return = false;
 	}
+	state->lookahead = next;
+}
+
+static void consumeInput(struct LexerState* state)
+{
+	state->c = state->lookahead;
+	state->pos = state->lookahead_pos;
+	readInputAndHandleLineEndings(state);
 }
 int initLexer(struct LexerState* state, const char* file_path)
 {
 	state->line = 0;
 	state->column = 0;
 	state->pos = 0;
+	state->lookahead_pos = 0;
 	state->line_pos = 0;
 	state->next_line_pos = 0;
 	state->line_beginning = true;
@@ -431,6 +449,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
 		return -1;
 	}
+	readInputAndHandleLineEndings(state);
 	consumeInput(state);
 	state->carriage_return = false;
 	return 0;
@@ -1023,6 +1042,8 @@ static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
 	}
 	return true;
 }
+
+int lexIfPunktuator(struct LexerState* state, struct LexerToken* token) {}
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
