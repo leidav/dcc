@@ -84,9 +84,10 @@ int main(int argc, const char** argv)
 			fprintf(stderr, "Lexer error ");
 			resetColor();
 			int character = (int)lexer_state.c;
-			fprintf(stderr, "At %s:%d:%d unexpected character:%c (0x%X)\n",
-			        lexer_state.current_file.name, lexer_state.line + 1,
-			        lexer_state.column + 1, lexer_state.c, character);
+			fprintf(
+			    stderr, "At %s:%d:%d unexpected character:%c (0x%X)\n",
+			    lexer_state.current_file.name, lexer_state.current_pos.line + 1,
+			    lexer_state.current_pos.column + 1, lexer_state.c, character);
 
 			int max_length = 120;
 			if (isatty(STDOUT_FILENO)) {
@@ -94,10 +95,9 @@ int main(int argc, const char** argv)
 				ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size);
 				max_length = MIN(terminal_size.ws_col, 120);
 			}
-			if (lexer_state.column < max_length) {
-				printf("%d\n", lexer_state.line_pos);
-				printErrorLine(lexer_state.line_pos, lexer_state.column,
-				               argv[1]);
+			if (lexer_state.current_pos.column < max_length) {
+				printErrorLine(lexer_state.current_pos.line_pos,
+				               lexer_state.current_pos.column, argv[1]);
 			}
 		} else {
 			printToken(&lexer_state, &token);

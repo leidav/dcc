@@ -1,6 +1,7 @@
 #include "lexer.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "helper.h"
@@ -20,16 +21,16 @@ static bool skipBackslashNewline(struct LexerState* state);
 
 static void getFileContext(struct LexerState* state, struct FileContext* ctx)
 {
-	ctx->line = state->line;
-	ctx->column = state->column;
-	ctx->line_pos = state->line_pos;
+	ctx->line = state->current_pos.line;
+	ctx->column = state->current_pos.column;
+	ctx->line_pos = state->current_pos.line_pos;
 }
 static void setFileContext(struct LexerState* state,
                            const struct FileContext* ctx)
 {
-	state->line = ctx->line;
-	state->column = ctx->column;
-	state->line_pos = ctx->line_pos;
+	state->current_pos.line = ctx->line;
+	state->current_pos.column = ctx->column;
+	state->current_pos.line_pos = ctx->line_pos;
 }
 
 static int createSimpleToken(struct LexerToken* token,
@@ -396,18 +397,18 @@ static void readInputAndHandleLineEndings(struct LexerState* state)
 {
 	// support unix, dos and legacy mac text files
 	char next = readChar(&state->current_file);
-	state->lookahead_pos++;
+	state->lookahead_pos.file_pos++;
 	switch (next) {
 		case '\r':
-			state->next_line_pos = state->lookahead_pos;
+			state->lookahead_pos.line_pos = state->lookahead_pos.file_pos;
 			state->carriage_return = true;
 			next = '\n';
 			break;
 		case '\n':
-			state->next_line_pos = state->lookahead_pos;
+			state->lookahead_pos.line_pos = state->lookahead_pos.file_pos;
 			if (state->carriage_return) {
 				next = readChar(&state->current_file);
-				state->lookahead_pos++;
+				state->lookahead_pos.file_pos++;
 				if (next == '\r') {
 					next = '\n';
 				} else {
@@ -424,17 +425,19 @@ static void readInputAndHandleLineEndings(struct LexerState* state)
 static void consumeInput(struct LexerState* state)
 {
 	state->c = state->lookahead;
-	state->pos = state->lookahead_pos;
+	state->current_pos = state->lookahead_pos;
+	if (state->lookahead == '\n') {
+		state->lookahead_pos.column = 0;
+		state->lookahead_pos.line++;
+	} else {
+		state->lookahead_pos.column++;
+	}
 	readInputAndHandleLineEndings(state);
 }
 int initLexer(struct LexerState* state, const char* file_path)
 {
-	state->line = 0;
-	state->column = 0;
-	state->pos = 0;
-	state->lookahead_pos = 0;
-	state->line_pos = 0;
-	state->next_line_pos = 0;
+	memset(&state->current_pos, 0, sizeof(state->current_pos));
+	memset(&state->lookahead_pos, 0, sizeof(state->lookahead_pos));
 	state->line_beginning = true;
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
@@ -458,13 +461,10 @@ static bool skipIfWhiteSpace(struct LexerState* state)
 {
 	bool isWhitespace;
 	if (state->c == '\n') {
-		state->column = 0;
-		state->line++;
 		state->line_beginning = true;
 		consumeInput(state);
 		isWhitespace = true;
 	} else if (state->c == ' ' || state->c == '\t') {
-		state->column++;
 		consumeInput(state);
 		isWhitespace = true;
 	} else if (state->c == '\\') {
@@ -484,15 +484,11 @@ static bool skipBackslashNewline(struct LexerState* state)
 {
 	bool success = true;
 	while (state->c == '\\') {
-		state->column++;
 		consumeInput(state);
 		while ((state->c == ' ') || (state->c == '\t')) {
-			state->column++;
 			consumeInput(state);
 		}
 		if (state->c == '\n') {
-			state->column = 0;
-			state->line++;
 			consumeInput(state);
 		} else {
 			success = false;
@@ -504,7 +500,6 @@ static bool skipBackslashNewline(struct LexerState* state)
 
 static bool consumeLexableChar(struct LexerState* state)
 {
-	state->column++;
 	consumeInput(state);
 	return skipBackslashNewline(state);
 }
@@ -514,8 +509,6 @@ static bool skipMultiLineComment(struct LexerState* state)
 	bool success = true;
 	while (state->c != INPUT_EOF) {
 		if (state->c == '\n') {
-			state->column = 0;
-			state->line++;
 			consumeInput(state);
 		} else if (state->c == '*') {
 			if (!consumeLexableChar(state)) {
@@ -528,7 +521,6 @@ static bool skipMultiLineComment(struct LexerState* state)
 				break;
 			}
 		} else {
-			state->column++;
 			consumeInput(state);
 		}
 	}
@@ -542,8 +534,6 @@ static void skipSingleLineComment(struct LexerState* state)
 {
 	while (state->c != INPUT_EOF) {
 		if (state->c == '\n') {
-			state->column = 0;
-			state->line++;
 			consumeInput(state);
 			skipBackslashNewline(state);
 			break;
@@ -554,7 +544,9 @@ static void skipSingleLineComment(struct LexerState* state)
 static bool skipWhiteSpaceOrComments(struct LexerState* state)
 {
 	/*skipWhiteSpaces(state);
-	while (state->c == '\\') {
+	while (state->c == '/') {
+	}*/
+	/*while (state->c == '\\') {
 	    if (!consumeLexableChar(state)) {
 	        return false;
 	    }
@@ -590,7 +582,6 @@ static bool lexEscapeSequence(int* c, struct LexerState* state)
 			*c <<= 3;
 			*c += state->c - '0';
 			i++;
-			state->column++;
 			consumeInput(state);
 		}
 	} else {
@@ -633,7 +624,6 @@ static bool lexEscapeSequence(int* c, struct LexerState* state)
 				*c = 0x1b;
 				break;
 			case 'x':
-				state->column++;
 				consumeInput(state);
 				*c = 0;
 				int i = 0;
@@ -645,7 +635,6 @@ static bool lexEscapeSequence(int* c, struct LexerState* state)
 						*c += (state->c & 0xdf) - 'A' + 10;
 					}
 					i++;
-					state->column++;
 					consumeInput(state);
 				}
 				break;
@@ -675,7 +664,6 @@ static int lexStringLiteralPiece(struct LexerState* state)
 			}
 		} else {
 			read_buffer[length] = state->c;
-			state->column++;
 			consumeInput(state);
 			length++;
 		}
@@ -722,7 +710,6 @@ static bool lexCharacterLiteral(struct LexerState* state,
 		} else {
 			character <<= 8;
 			character |= state->c;
-			state->column++;
 			consumeInput(state);
 		}
 	}
@@ -1050,7 +1037,6 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 	bool success = true;
 	bool again = true;
 	while (again) {
-		state->line_pos = state->next_line_pos;
 		again = false;
 		struct FileContext ctx;
 		skipWhiteSpaces(state);

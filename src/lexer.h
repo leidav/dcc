@@ -170,13 +170,15 @@ struct LexerConstantSet {
 	struct LexerConstant* constants;
 };
 
-struct LexerState {
-	uint16_t line;
-	uint16_t column;
+struct LexerSourcePos {
+	int line;
+	int column;
+	int file_pos;
 	int line_pos;
-	int next_line_pos;
-	int pos;
-	int lookahead_pos;
+};
+struct LexerState {
+	struct LexerSourcePos current_pos;
+	struct LexerSourcePos lookahead_pos;
 	bool carriage_return;
 	bool line_beginning;
 	char c;
