@@ -521,8 +521,11 @@ static bool skipBackslashNewlineLookahead(struct LexerState* state)
 
 static bool consumeLexableChar(struct LexerState* state)
 {
+	if (!skipBackslashNewlineLookahead(state)) {
+		return false;
+	}
 	consumeInput(state);
-	return skipBackslashNewlineLookahead(state);
+	return true;
 }
 
 static bool skipMultiLineComment(struct LexerState* state)
