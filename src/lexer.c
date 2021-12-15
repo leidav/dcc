@@ -567,29 +567,23 @@ static void skipSingleLineComment(struct LexerState* state)
 }
 static bool skipWhiteSpaceOrComments(struct LexerState* state)
 {
-	/*skipWhiteSpaces(state);
+	skipWhiteSpaces(state);
 	while (state->c == '/') {
-	}*/
-	/*while (state->c == '\\') {
-	    if (!consumeLexableChar(state)) {
-	        return false;
-	    }
-	    if (state->c == '*') {
-	        if (!consumeLexableChar(state)) {
-	            return false;
-	        }
-	        if (!skipMultiLineComment(state)) {
-	            return false;
-	        }
-	    } else if (state->c == '\\') {
-	        if (!consumeLexableChar(state)) {
-	            return false;
-	        }
-	        skipSingleLineComment(state);
-	    } else {
-	        break;
-	    }
-	}*/
+		skipBackslashNewlineLookahead(state);
+		if (state->lookahead == '/') {
+			consumeInput(state);
+			skipSingleLineComment(state);
+		} else if (state->lookahead == '*') {
+			consumeInput(state);
+			consumeInput(state);
+			if (!skipMultiLineComment(state)) {
+				return false;
+			}
+		} else {
+			return true;
+		}
+		skipWhiteSpaces(state);
+	}
 	return true;
 }
 static bool lexEscapeSequence(int* c, struct LexerState* state)
@@ -666,9 +660,9 @@ static bool lexEscapeSequence(int* c, struct LexerState* state)
 	}
 	return success;
 }
-static int lexStringLiteralPiece(struct LexerState* state)
+static int lexStringLiteralPiece(int offset, struct LexerState* state)
 {
-	int length = 0;
+	int length = offset;
 	while (state->c != '"') {
 		if (length == READ_BUFFER_SIZE - 1 || state->c == INPUT_EOF ||
 		    state->c == '\n') {
@@ -700,9 +694,21 @@ static int lexStringLiteralPiece(struct LexerState* state)
 static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
                              struct FileContext* ctx)
 {
-	int length = lexStringLiteralPiece(state);
-	if (length < 0) {
-		return false;
+	int length = 0;
+	while (true) {
+		length = lexStringLiteralPiece(length, state);
+		if (length < 0) {
+			return false;
+		}
+		if (!skipWhiteSpaceOrComments(state)) {
+			return false;
+		}
+		if (state->c != '"') {
+			break;
+		}
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
 	}
 	read_buffer[length] = 0;
 	int index = addString(&state->string_literals, read_buffer, length);
