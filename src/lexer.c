@@ -692,7 +692,7 @@ static int lexStringLiteralPiece(int offset, struct LexerState* state)
 	return length;
 }
 static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
-                             struct FileContext* ctx)
+                             const struct FileContext* ctx)
 {
 	int length = 0;
 	while (true) {
@@ -721,7 +721,7 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 
 static bool lexCharacterLiteral(struct LexerState* state,
                                 struct LexerToken* token,
-                                struct FileContext* ctx)
+                                const struct FileContext* ctx)
 {
 	int character = 0;
 	while (state->c != '\'') {
@@ -1060,7 +1060,396 @@ static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
 	return true;
 }
 
-int lexIfPunktuator(struct LexerState* state, struct LexerToken* token) {}
+int lexTokens(struct LexerState* state, struct LexerToken* token,
+              const struct FileContext* ctx)
+{
+	switch (state->c) {
+		case '/':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Divison Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_DIV_ASSIGNMENT);
+			} else {
+				//  Division Operator
+				createSimpleToken(token, ctx, OPERATOR_DIV);
+			}
+			break;
+		case '*':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Multiplication Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_MUL_ASSIGNMENT);
+			} else {
+				// ASTERISC
+				createSimpleToken(token, ctx, ASTERISC);
+			}
+			break;
+
+		case '%':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Modulo Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_MODULO_ASSIGNMENT);
+			} else {
+				// Modulo Operator
+				createSimpleToken(token, ctx, OPERATOR_MODULO);
+			}
+			break;
+		case '+':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Plus Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_PLUS_ASSIGNMENT);
+			} else if (state->c == '+') {
+				// PlusPlus Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_PLUSPLUS);
+			} else {
+				// Plus Operator
+				createSimpleToken(token, ctx, OPERATOR_PLUS);
+			}
+			break;
+		case '-':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Minus Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_MINUS_ASSIGNMENT);
+			} else if (state->c == '-') {
+				// MinusMinus Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_MINUSMINUS);
+			} else if (state->c == '>') {
+				// Dereference Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_DEREFERENCE);
+			} else {
+				// Minus Operator
+				createSimpleToken(token, ctx, OPERATOR_MINUS);
+			}
+			break;
+		case '&':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// And Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_AND_ASSIGNMENT);
+			} else if (state->c == '&') {
+				// Logical And Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_LOGICAL_AND);
+			} else {
+				// And Operator
+				createSimpleToken(token, ctx, OPERATOR_AND);
+			}
+			break;
+		case '|':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Or Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_OR_ASSIGNMENT);
+			} else if (state->c == '|') {
+				// Logical Or Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_LOGICAL_OR);
+			} else {
+				// Or Operator
+				createSimpleToken(token, ctx, OPERATOR_OR);
+			}
+			break;
+		case '^':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Xor Assignment Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_XOR_ASSIGNMENT);
+			} else {
+				// Xor Operator
+				createSimpleToken(token, ctx, OPERATOR_XOR);
+			}
+			break;
+
+		case '~':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			// Negate Operator
+			createSimpleToken(token, ctx, OPERATOR_NEGATE);
+			break;
+		case '!':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Not Equal Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_NOT_EQUAL);
+			} else {
+				// Logical Not Operator
+				createSimpleToken(token, ctx, OPERATOR_LOGICAL_NOT);
+			}
+			break;
+		case '<':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '<') {
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				if (state->c == '=') {
+					// Shift left Assignment Operator
+					if (!consumeLexableChar(state)) {
+						return LEXER_RESULT_FAIL;
+					}
+					createSimpleToken(token, ctx,
+					                  OPERATOR_SHIFT_LEFT_ASSIGNMENT);
+				} else {
+					// Shift left Operator
+					createSimpleToken(token, ctx, OPERATOR_SHIFT_LEFT);
+				}
+			} else if (state->c == '=') {
+				// Less or equal Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_LESS_OR_EQUAL);
+			} else {
+				// Less than Operator
+				createSimpleToken(token, ctx, OPERATOR_LESS);
+			}
+			break;
+		case '>':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '>') {
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				if (state->c == '=') {
+					// Shift right Assignment Operator
+					if (!consumeLexableChar(state)) {
+						return LEXER_RESULT_FAIL;
+					}
+					createSimpleToken(token, ctx,
+					                  OPERATOR_SHIFT_RIGHT_ASSIGNMENT);
+				} else {
+					// Shift right Operator
+					createSimpleToken(token, ctx, OPERATOR_SHIFT_RIGHT);
+				}
+			} else if (state->c == '=') {
+				// Greater or equal Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_GREATER_OR_EQUAL);
+			} else {
+				// Greater than Operator
+				createSimpleToken(token, ctx, OPERATOR_GREATER);
+			}
+			break;
+		case '=':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == '=') {
+				// Equal Comparsion Operator
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				createSimpleToken(token, ctx, OPERATOR_EQUAL);
+			} else {
+				// Assignment Operator
+				createSimpleToken(token, ctx, OPERATOR_ASSIGNMENT);
+			}
+			break;
+		case '?':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, OPERATOR_CONDITIONAL);
+			break;
+		case ':':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, COLON);
+			break;
+		case ';':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, SEMICOLON);
+			break;
+		case ',':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, COMMA);
+		case '(':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, PARENTHESE_LEFT);
+			break;
+		case ')':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, PARENTHESE_RIGHT);
+			break;
+		case '[':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, BRACKET_LEFT);
+			break;
+		case ']':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, BRACKET_RIGHT);
+			break;
+		case '{':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, BRACE_LEFT);
+			break;
+		case '}':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			createSimpleToken(token, ctx, BRACE_RIGHT);
+			break;
+		case '"':
+			consumeInput(state);
+			if (!lexStringLiteral(state, token, ctx)) {
+				return LEXER_RESULT_FAIL;
+			}
+			break;
+		case '\'':
+			consumeInput(state);
+			if (!lexCharacterLiteral(state, token, ctx)) {
+				return LEXER_RESULT_FAIL;
+			}
+			break;
+		case '.':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (isDecimalDigit(state->c)) {
+				if (!lexFractionalNumber(state, token, ctx, false, 0)) {
+					return LEXER_RESULT_FAIL;
+				}
+			} else {
+				createSimpleToken(token, ctx, OPERATOR_POINT);
+			}
+			break;
+		case '0':
+			if (!consumeLexableChar(state)) {
+				return LEXER_RESULT_FAIL;
+			}
+			if (state->c == 'x' || state->c == 'X') {
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				if (isHexDigit(state->c)) {
+					if (!lexHexNumber(state, token, ctx)) {
+						return LEXER_RESULT_FAIL;
+					}
+				} else {
+					// not a valid hex number
+					return LEXER_RESULT_FAIL;
+				}
+			} else if (state->c == 'b') {
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
+				if (isBinaryDigit(state->c)) {
+					if (!lexBinaryNumber(state, token, ctx)) {
+						return LEXER_RESULT_FAIL;
+					}
+				} else {
+					return LEXER_RESULT_FAIL;
+				}
+			} else if (state->c >= '1' && state->c <= '7') {
+				if (!lexOctalNumber(state, token, ctx)) {
+					return LEXER_RESULT_FAIL;
+				}
+			} else {
+				createIntegerConstantToken(token, ctx, 0, false);
+			}
+			break;
+		default:
+			if (isAlphabetic(state->c)) {
+				// Keyword or Identifier
+				if (!lexWord(state, token, ctx)) {
+					return LEXER_RESULT_FAIL;
+				}
+			} else if (state->c >= '1' && state->c <= '9') {
+				// number
+				if (!lexNumber(state, token, ctx)) {
+					return LEXER_RESULT_FAIL;
+				}
+			} else {
+				createSimpleToken(token, ctx, TOKEN_UNKNOWN);
+				return LEXER_RESULT_FAIL;
+			}
+			break;
+	}
+	return LEXER_RESULT_SUCCESS;
+}
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
@@ -1069,434 +1458,30 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 	while (again) {
 		again = false;
 		struct FileContext ctx;
-		skipWhiteSpaces(state);
+		skipWhiteSpaceOrComments(state);
 		getFileContext(state, &ctx);
 		if (state->c == INPUT_EOF) {
 			getFileContext(state, &ctx);
 			createSimpleToken(token, &ctx, TOKEN_EOF);
-		} else {
-			if (state->c == '#') {
-				// preprocessor
-				if (!state->line_beginning) {
-					success = false;
-					break;
-				}
-				while (state->c != '\n') {
-					// skip preprocessor lines
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-				}
-				again = true;
-			} else if (state->c == '/') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '/') {
-					// Single Line Comment
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					skipSingleLineComment(state);
-					again = true;
-				} else if (state->c == '*') {
-					// Multi Line Comment
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					success = skipMultiLineComment(state);
-					if (success) {
-						again = true;
-					}
-				} else if (state->c == '=') {
-					// Divison Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_DIV_ASSIGNMENT);
-				} else {
-					//  Division Operator
-					createSimpleToken(token, &ctx, OPERATOR_DIV);
-				}
-			} else if (state->c == '*') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Multiplication Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_MUL_ASSIGNMENT);
-				} else {
-					// ASTERISC
-					createSimpleToken(token, &ctx, ASTERISC);
-				}
-			} else if (state->c == '%') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Modulo Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_MODULO_ASSIGNMENT);
-				} else {
-					// Modulo Operator
-					createSimpleToken(token, &ctx, OPERATOR_MODULO);
-				}
-			} else if (state->c == '+') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Plus Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_PLUS_ASSIGNMENT);
-				} else if (state->c == '+') {
-					// PlusPlus Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_PLUSPLUS);
-				} else {
-					// Plus Operator
-					createSimpleToken(token, &ctx, OPERATOR_PLUS);
-				}
-			} else if (state->c == '-') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Minus Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_MINUS_ASSIGNMENT);
-				} else if (state->c == '-') {
-					// MinusMinus Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_MINUSMINUS);
-				} else if (state->c == '>') {
-					// Dereference Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_DEREFERENCE);
-				} else {
-					// Plus Operator
-					createSimpleToken(token, &ctx, OPERATOR_MINUS);
-				}
-			} else if (state->c == '&') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// And Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_AND_ASSIGNMENT);
-				} else if (state->c == '&') {
-					// Logical And Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_AND);
-				} else {
-					// And Operator
-					createSimpleToken(token, &ctx, OPERATOR_AND);
-				}
-			} else if (state->c == '|') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Or Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_OR_ASSIGNMENT);
-				} else if (state->c == '&') {
-					// Logical And Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_OR);
-				} else {
-					// Plus Operator
-					createSimpleToken(token, &ctx, OPERATOR_OR);
-				}
-			} else if (state->c == '^') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Xor Assignment Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_XOR_ASSIGNMENT);
-				} else {
-					// Plus Operator
-					createSimpleToken(token, &ctx, OPERATOR_XOR);
-				}
-			} else if (state->c == '~') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				// Negate Operator
-				createSimpleToken(token, &ctx, OPERATOR_NEGATE);
-			} else if (state->c == '!') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Not Equal Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_NOT_EQUAL);
-				} else {
-					// Logical Not Operator
-					createSimpleToken(token, &ctx, OPERATOR_LOGICAL_NOT);
-				}
-			} else if (state->c == '<') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '<') {
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					if (state->c == '=') {
-						// Shift left Assignment Operator
-						if (!consumeLexableChar(state)) {
-							success = false;
-							break;
-						}
-						createSimpleToken(token, &ctx,
-						                  OPERATOR_SHIFT_LEFT_ASSIGNMENT);
-					} else {
-						// Shift left Operator
-						createSimpleToken(token, &ctx, OPERATOR_SHIFT_LEFT);
-					}
-				} else if (state->c == '=') {
-					// Less or equal Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_LESS_OR_EQUAL);
-				} else {
-					// Less than Operator
-					createSimpleToken(token, &ctx, OPERATOR_LESS);
-				}
-			} else if (state->c == '>') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '>') {
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					if (state->c == '=') {
-						// Shift right Assignment Operator
-						if (!consumeLexableChar(state)) {
-							success = false;
-							break;
-						}
-						createSimpleToken(token, &ctx,
-						                  OPERATOR_SHIFT_RIGHT_ASSIGNMENT);
-					} else {
-						// Shift right Operator
-						createSimpleToken(token, &ctx, OPERATOR_SHIFT_RIGHT);
-					}
-				} else if (state->c == '=') {
-					// Greater or equal Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_GREATER_OR_EQUAL);
-				} else {
-					// Greater than Operator
-					createSimpleToken(token, &ctx, OPERATOR_GREATER);
-				}
-			} else if (state->c == '=') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == '=') {
-					// Equal Comparsion Operator
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					createSimpleToken(token, &ctx, OPERATOR_EQUAL);
-				} else {
-					// Assignment Operator
-					createSimpleToken(token, &ctx, OPERATOR_ASSIGNMENT);
-				}
-			} else if (state->c == '?') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, OPERATOR_CONDITIONAL);
-			} else if (state->c == ':') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, COLON);
-			} else if (state->c == ';') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, SEMICOLON);
-			} else if (state->c == ',') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, COMMA);
-			} else if (state->c == '(') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, PARENTHESE_LEFT);
-			} else if (state->c == ')') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, PARENTHESE_RIGHT);
-			} else if (state->c == '[') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, BRACKET_LEFT);
-			} else if (state->c == ']') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, BRACKET_RIGHT);
-			} else if (state->c == '{') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, BRACE_LEFT);
-			} else if (state->c == '}') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				createSimpleToken(token, &ctx, BRACE_RIGHT);
-			} else if (state->c == '"') {
-				consumeInput(state);
-				success = lexStringLiteral(state, token, &ctx);
-			} else if (state->c == '\'') {
-				consumeInput(state);
-				success = lexCharacterLiteral(state, token, &ctx);
-
-			} else if (state->c == '.') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (isDecimalDigit(state->c)) {
-					if (!lexFractionalNumber(state, token, &ctx, false, 0)) {
-						success = false;
-						break;
-					}
-				} else {
-					createSimpleToken(token, &ctx, OPERATOR_POINT);
-				}
-			} else if (isAlphabetic(state->c)) {
-				// Keyword or Identifier
-				success = lexWord(state, token, &ctx);
-			} else if (state->c == '0') {
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
-				if (state->c == 'x' || state->c == 'X') {
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					if (isHexDigit(state->c)) {
-						success = lexHexNumber(state, token, &ctx);
-					} else {
-						// not a valid hex number
-						success = false;
-					}
-				} else if (state->c == 'b') {
-					if (!consumeLexableChar(state)) {
-						success = false;
-						break;
-					}
-					if (isBinaryDigit(state->c)) {
-						success = lexBinaryNumber(state, token, &ctx);
-					} else {
-						success = false;
-					}
-
-				} else if (state->c >= '1' && state->c <= '7') {
-					success = lexOctalNumber(state, token, &ctx);
-				} else {
-					createIntegerConstantToken(token, &ctx, 0, false);
-				}
-			} else if (state->c >= '1' && state->c <= '9') {
-				// number
-				success = lexNumber(state, token, &ctx);
-
-			} else {
+			break;
+		} else if (state->c == '#') {
+			// preprocessor
+			if (!state->line_beginning) {
 				success = false;
-				createSimpleToken(token, &ctx, TOKEN_UNKNOWN);
+				break;
+			}
+			while (state->c != '\n') {
+				// skip preprocessor lines
+				if (!consumeLexableChar(state)) {
+					success = false;
+					break;
+				}
+			}
+			again = true;
+		} else {
+			if (lexTokens(state, token, &ctx) != LEXER_RESULT_SUCCESS) {
+				success = false;
+				break;
 			}
 		}
 	}
