@@ -110,6 +110,17 @@ static int createCharacterConstantToken(struct LexerToken* token,
 	return 0;
 }
 
+static int createPPNumberToken(struct LexerToken* token,
+                               const struct FileContext* ctx, uint16_t index)
+{
+	token->line = ctx->line;
+	token->column = ctx->column;
+	token->line_pos = ctx->line_pos;
+	token->type = PP_NUMBER;
+	token->value.string_index = index;
+	return 0;
+}
+
 static bool matchKeyword(const char* buffer, uint32_t buffer_hash,
                          const struct FileContext* ctx,
                          struct LexerToken* token)
@@ -449,6 +460,10 @@ int initLexer(struct LexerState* state, const char* file_path)
 		return -1;
 	}
 	if (createStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
+	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
+		return -1;
+	}
+	if (createStringSet(&state->pp_numbers, LEXER_LITERAL_STRINGSET_SIZE,
 	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
 		return -1;
 	}
@@ -1057,6 +1072,48 @@ static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
 	if (!lexIntegerSuffix(state, token, ctx, number)) {
 		return false;
 	}
+	return true;
+}
+static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
+                        const struct FileContext* ctx)
+{
+	int length = 0;
+	if (state->c == '.') {
+		read_buffer[length] = state->c;
+		length++;
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+	}
+	while (isDecimalDigit(state->c)) {
+		read_buffer[length] = state->c;
+		length++;
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+	}
+	while (isAlphaNumeric(state->c) || state->c == '.') {
+		read_buffer[length] = state->c;
+		length++;
+		if ((state->c == 'e') || (state->c == 'E')) {
+			if ((state->lookahead == '-') || (state->lookahead == '+')) {
+				if (!consumeLexableChar(state)) {
+					return false;
+				}
+				read_buffer[length] = state->c;
+				length++;
+			}
+		}
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+	}
+	read_buffer[length] = 0;
+	int index = addString(&state->pp_numbers, read_buffer, length);
+	if (index == -1) {
+		return false;
+	}
+	createPPNumberToken(token, ctx, index);
 	return true;
 }
 

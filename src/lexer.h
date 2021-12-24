@@ -186,6 +186,7 @@ struct LexerState {
 	struct InputFile current_file;
 	struct StringSet identifiers;
 	struct StringSet string_literals;
+	struct StringSet pp_numbers;
 	struct LexerConstantSet constants;
 };
 
