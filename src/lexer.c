@@ -1495,42 +1495,6 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 				createSimpleToken(token, ctx, OPERATOR_POINT);
 			}
 			break;
-		/*case '0':
-			if (!consumeLexableChar(state)) {
-			    return LEXER_RESULT_FAIL;
-			}
-			if (state->c == 'x' || state->c == 'X') {
-			    if (!consumeLexableChar(state)) {
-			        return LEXER_RESULT_FAIL;
-			    }
-			    if (isHexDigit(state->c)) {
-			        if (!lexHexNumber(state, token, ctx)) {
-			            return LEXER_RESULT_FAIL;
-			        }
-			    } else {
-			        // not a valid hex number
-			        return LEXER_RESULT_FAIL;
-			    }
-			} else if (state->c == 'b') {
-			    if (!consumeLexableChar(state)) {
-			        return LEXER_RESULT_FAIL;
-			    }
-			    if (isBinaryDigit(state->c)) {
-			        if (!lexBinaryNumber(state, token, ctx)) {
-			            return LEXER_RESULT_FAIL;
-			        }
-			    } else {
-			        return LEXER_RESULT_FAIL;
-			    }
-			} else if (state->c >= '1' && state->c <= '7') {
-			    if (!lexOctalNumber(state, token, ctx)) {
-			        return LEXER_RESULT_FAIL;
-			    }
-			} else {
-			    createIntegerConstantToken(token, ctx, 0, false);
-			}
-			break;
-			*/
 		default:
 			if (isAlphabetic(state->c)) {
 				// Keyword or Identifier
