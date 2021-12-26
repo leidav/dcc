@@ -85,7 +85,7 @@ int main(int argc, const char** argv)
 			resetColor();
 			int character = (int)lexer_state.c;
 			fprintf(
-			    stderr, "At %s:%d:%d unexpected character:%c (0x%X)\n",
+			    stderr, "At %s:%d:%d unexpected character:\"%c\" (0x%X)\n",
 			    lexer_state.current_file.name, lexer_state.current_pos.line + 1,
 			    lexer_state.current_pos.column + 1, lexer_state.c, character);
 
