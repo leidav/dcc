@@ -15,6 +15,20 @@ struct FileContext {
 	int column;
 	int line_pos;
 };
+struct StringIterator {
+	const char* start;
+	const char* cur;
+};
+
+static void initStringIterator(struct StringIterator* it, const char* string)
+{
+	it->start = string;
+	it->cur = string;
+}
+static char next(struct StringIterator* it)
+{
+	return *(++it->cur);
+}
 
 static bool consumeLexableChar(struct LexerState* state);
 static bool skipBackslashNewline(struct LexerState* state);
@@ -820,77 +834,66 @@ static double exponential(int exponent)
 	return factor;
 }
 
-static bool lexExponent(struct LexerState* state, int* exponent)
+static bool parseExponent(struct StringIterator* it, int* exponent)
 {
 	int sign = 1;
-	if (state->c == '-') {
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+	char c = *it->cur;
+	if (c == '-') {
+		c = next(it);
 		sign = -1;
-	} else if (state->c == '+') {
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+	} else if (c == '+') {
+		c = next(it);
 	}
-	if (!isDecimalDigit(state->c)) {
+	if (!isDecimalDigit(c)) {
 		return false;
 	}
-	int integer = (int)(state->c - '0');
-	if (!consumeLexableChar(state)) {
-		return false;
-	}
-	while (isDecimalDigit(state->c)) {
+	int integer = (int)(c - '0');
+	c = next(it);
+	while (isDecimalDigit(c)) {
 		integer *= 10;
-		integer += (int)(state->c - '0');
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		integer += (int)(c - '0');
+		c = next(it);
 	}
 	*exponent = integer * sign;
 	return true;
 }
 
-static bool lexFractionalNumber(struct LexerState* state,
-                                struct LexerToken* token,
-                                const struct FileContext* ctx,
-                                bool has_integer_part, double start)
+static bool parseFractionalNumber(struct StringIterator* it,
+                                  struct LexerToken* token,
+                                  const struct FileContext* ctx,
+                                  bool has_integer_part, double start)
 {
 	double num = 0.0;
 	double factor = 1.0;
 	int length = 0;
-	while (isDecimalDigit(state->c)) {
-		num += (double)(state->c - '0');
+	char c = *it->cur;
+	while (isDecimalDigit(c)) {
+		num += (double)(c - '0');
 		num /= 10.0;
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		c = next(it);
 		length++;
 	}
 	if ((!has_integer_part) && (length == 0)) {
 		return false;
 	}
 
-	if ((state->c == 'e') || (state->c == 'E')) {
+	if ((c == 'e') || (c == 'E')) {
 		if (length == 0) {
 			return false;
 		}
 		// exponent
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		it->cur++;
 		int exponent;
-		if (!lexExponent(state, &exponent)) {
+		if (!parseExponent(it, &exponent)) {
 			return -1;
 		}
 		factor = exponential(exponent);
 	}
 	bool is_float = false;
-	if (state->c == 'f') {
+	c = *it->cur;
+	if (c == 'f') {
 		// float
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		it->cur++;
 		is_float = true;
 	}
 	double floatingpoint = (start + num) * factor;
@@ -898,76 +901,55 @@ static bool lexFractionalNumber(struct LexerState* state,
 	return true;
 }
 
-static bool lexIntegerSuffix(struct LexerState* state, struct LexerToken* token,
-                             const struct FileContext* ctx, uint64_t integer)
+static bool parseIntegerSuffix(struct StringIterator* it,
+                               struct LexerToken* token,
+                               const struct FileContext* ctx, uint64_t integer)
 {
 	// integer
 	bool is_unsigned = false;
-	if ((state->c == 'u') || (state->c == 'U')) {
+	char c = *it->cur;
+	if ((c == 'u') || (c == 'U')) {
 		// unsigned
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
 		is_unsigned = true;
-
-		if (state->c == 'l') {
+		c = next(it);
+		if (c == 'l') {
 			// long
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
-			if (state->c == 'l') {
+			c = next(it);
+			if (c == 'l') {
 				// long long
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
+				c = next(it);
 			}
-		} else if (state->c == 'L') {
+		} else if (c == 'L') {
 			// long
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
-			if (state->c == 'L') {
+			c = next(it);
+			if (c == 'L') {
 				// long long
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
+				c = next(it);
 			}
 		}
 	}
-	if (state->c == 'l') {
+	if (c == 'l') {
 		// long
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
-		if (state->c == 'l') {
+		c = next(it);
+		if (c == 'l') {
 			// long long
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			c = next(it);
 		}
-		if ((state->c == 'u') || (state->c == 'U')) {
+		if ((c == 'u') || (c == 'U')) {
 			// unsigned
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			it->cur++;
 			is_unsigned = true;
 		}
-	} else if (state->c == 'L') {
+	} else if (c == 'L') {
 		// long
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
-		if (state->c == 'L') {
+		c = next(it);
+		if (c == 'L') {
 			// long long
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			c = next(it);
 		}
-		if ((state->c == 'u') || (state->c == 'U')) {
+		if ((c == 'u') || (c == 'U')) {
 			// unsigned
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			it->cur++;
 			is_unsigned = true;
 		}
 	}
@@ -975,107 +957,159 @@ static bool lexIntegerSuffix(struct LexerState* state, struct LexerToken* token,
 	return true;
 }
 
-static bool lexNumber(struct LexerState* state, struct LexerToken* token,
-                      const struct FileContext* ctx)
+static bool parseDecimalNumber(struct StringIterator* it,
+                               struct LexerToken* token,
+                               const struct FileContext* ctx)
 {
 	uint64_t integer = 0;
-	while (isDecimalDigit(state->c)) {
+	char c = *it->cur;
+	while (isDecimalDigit(c)) {
 		integer *= 10;
-		integer += (uint64_t)(state->c - '0');
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		integer += (uint64_t)(c - '0');
+		c = next(it);
 	}
-	if (state->c == '.') {
+	if (c == '.') {
 		// floating point
-		if (!consumeLexableChar(state)) {
+		it->cur++;
+		if (!parseFractionalNumber(it, token, ctx, true, (double)integer)) {
 			return false;
 		}
-		if (!lexFractionalNumber(state, token, ctx, true, (double)integer)) {
-			return false;
-		}
-	} else if ((state->c == 'e') || (state->c == 'E')) {
+		c = *it->cur;
+	} else if ((c == 'e') || (c == 'E')) {
 		// floating point exponent
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		it->cur++;
 		int exponent;
-		if (!lexExponent(state, &exponent)) {
+		if (!parseExponent(it, &exponent)) {
 			return false;
 		}
 		double factor = exponential(exponent);
 		bool is_float = false;
-		if (state->c == 'f') {
+		c = *it->cur;
+		if (c == 'f') {
 			// float
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			it->cur++;
 			is_float = true;
 		}
 		double floatingpoint = integer * factor;
 		createFloatingpointConstantToken(token, ctx, floatingpoint, is_float);
 	} else {
-		if (!lexIntegerSuffix(state, token, ctx, integer)) {
+		if (!parseIntegerSuffix(it, token, ctx, integer)) {
 			return false;
 		}
 	}
 	return true;
 }
-static bool lexHexNumber(struct LexerState* state, struct LexerToken* token,
-                         const struct FileContext* ctx)
+static bool parseHexNumber(struct StringIterator* it, struct LexerToken* token,
+                           const struct FileContext* ctx)
 {
 	uint64_t number = 0;
-	while (isHexDigit(state->c)) {
+	char c = *it->cur;
+	while (isHexDigit(c)) {
 		number <<= 4;
-		if (isDecimalDigit(state->c)) {
-			number += state->c - '0';
+		if (isDecimalDigit(c)) {
+			number += c - '0';
 		} else {
-			number += (state->c & 0xdf) - 'A' + 10;
+			number += (c & 0xdf) - 'A' + 10;
 		}
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		c = next(it);
 	}
-	if (!lexIntegerSuffix(state, token, ctx, number)) {
+	if (!parseIntegerSuffix(it, token, ctx, number)) {
 		return false;
 	}
 	return true;
 }
 
-static bool lexOctalNumber(struct LexerState* state, struct LexerToken* token,
-                           const struct FileContext* ctx)
+static bool parseOctalNumber(struct StringIterator* it,
+                             struct LexerToken* token,
+                             const struct FileContext* ctx)
 {
 	uint64_t number = 0;
-	while (isOctalDigit(state->c)) {
+	char c = *it->cur;
+	while (isOctalDigit(c)) {
 		number <<= 3;
-		number += state->c - '0';
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		number += c - '0';
+		c = next(it);
 	}
-	if (!lexIntegerSuffix(state, token, ctx, number)) {
+	if (!parseIntegerSuffix(it, token, ctx, number)) {
 		return false;
 	}
 	return true;
 }
-static bool lexBinaryNumber(struct LexerState* state, struct LexerToken* token,
-                            const struct FileContext* ctx)
+static bool parseBinaryNumber(struct StringIterator* it,
+                              struct LexerToken* token,
+                              const struct FileContext* ctx)
 {
 	uint64_t number = 0;
-	while (isBinaryDigit(state->c)) {
+	char c = *it->cur;
+	while (isBinaryDigit(c)) {
 		number <<= 1;
-		number += state->c - '0';
-		if (!consumeLexableChar(state)) {
-			return false;
-		}
+		number += c - '0';
+		c = next(it);
 	}
-	if (!lexIntegerSuffix(state, token, ctx, number)) {
+	if (!parseIntegerSuffix(it, token, ctx, number)) {
 		return false;
 	}
 	return true;
 }
-static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
+static bool parseNumber(struct StringIterator* it, struct LexerToken* token,
                         const struct FileContext* ctx)
+{
+	char c = *it->cur;
+	switch (c) {
+		case '.':
+			c = next(it);
+			if (isDecimalDigit(c)) {
+				if (!parseFractionalNumber(it, token, ctx, false, 0)) {
+					return false;
+				}
+			} else {
+				createSimpleToken(token, ctx, OPERATOR_POINT);
+			}
+			break;
+		case '0':
+			c = next(it);
+			if (c == 'x' || c == 'X') {
+				c = next(it);
+				if (isHexDigit(c)) {
+					if (!parseHexNumber(it, token, ctx)) {
+						return false;
+					}
+				} else {
+					// not a valid hex number
+					return false;
+				}
+			} else if (c == 'b') {
+				c = next(it);
+				if (isBinaryDigit(c)) {
+					if (!parseBinaryNumber(it, token, ctx)) {
+						return false;
+					}
+				} else {
+					return false;
+				}
+			} else if (c >= '1' && c <= '7') {
+				if (!parseOctalNumber(it, token, ctx)) {
+					return LEXER_RESULT_FAIL;
+				}
+			} else {
+				createIntegerConstantToken(token, ctx, 0, false);
+			}
+			break;
+		default:
+			if (!parseDecimalNumber(it, token, ctx)) {
+				return false;
+			};
+			break;
+	}
+	if (*it->cur != 0) {
+		return false;
+	}
+	return true;
+}
+
+static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
+                        const struct FileContext* ctx,
+                        bool create_number_constant)
 {
 	int length = 0;
 	if (state->c == '.') {
@@ -1109,11 +1143,19 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
 		}
 	}
 	read_buffer[length] = 0;
-	int index = addString(&state->pp_numbers, read_buffer, length);
-	if (index == -1) {
-		return false;
+	if (create_number_constant) {
+		struct StringIterator it;
+		initStringIterator(&it, read_buffer);
+		if (!parseNumber(&it, token, ctx)) {
+			return false;
+		}
+	} else {
+		int index = addString(&state->pp_numbers, read_buffer, length);
+		if (index == -1) {
+			return false;
+		}
+		createPPNumberToken(token, ctx, index);
 	}
-	createPPNumberToken(token, ctx, index);
 	return true;
 }
 
@@ -1442,61 +1484,62 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '.':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
-			if (isDecimalDigit(state->c)) {
-				if (!lexFractionalNumber(state, token, ctx, false, 0)) {
+			if (isDecimalDigit(state->lookahead)) {
+				if (!lexPPNumber(state, token, ctx, true)) {
 					return LEXER_RESULT_FAIL;
 				}
 			} else {
+				if (!consumeLexableChar(state)) {
+					return LEXER_RESULT_FAIL;
+				}
 				createSimpleToken(token, ctx, OPERATOR_POINT);
 			}
 			break;
-		case '0':
+		/*case '0':
 			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
+			    return LEXER_RESULT_FAIL;
 			}
 			if (state->c == 'x' || state->c == 'X') {
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
-				if (isHexDigit(state->c)) {
-					if (!lexHexNumber(state, token, ctx)) {
-						return LEXER_RESULT_FAIL;
-					}
-				} else {
-					// not a valid hex number
-					return LEXER_RESULT_FAIL;
-				}
+			    if (!consumeLexableChar(state)) {
+			        return LEXER_RESULT_FAIL;
+			    }
+			    if (isHexDigit(state->c)) {
+			        if (!lexHexNumber(state, token, ctx)) {
+			            return LEXER_RESULT_FAIL;
+			        }
+			    } else {
+			        // not a valid hex number
+			        return LEXER_RESULT_FAIL;
+			    }
 			} else if (state->c == 'b') {
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
-				if (isBinaryDigit(state->c)) {
-					if (!lexBinaryNumber(state, token, ctx)) {
-						return LEXER_RESULT_FAIL;
-					}
-				} else {
-					return LEXER_RESULT_FAIL;
-				}
+			    if (!consumeLexableChar(state)) {
+			        return LEXER_RESULT_FAIL;
+			    }
+			    if (isBinaryDigit(state->c)) {
+			        if (!lexBinaryNumber(state, token, ctx)) {
+			            return LEXER_RESULT_FAIL;
+			        }
+			    } else {
+			        return LEXER_RESULT_FAIL;
+			    }
 			} else if (state->c >= '1' && state->c <= '7') {
-				if (!lexOctalNumber(state, token, ctx)) {
-					return LEXER_RESULT_FAIL;
-				}
+			    if (!lexOctalNumber(state, token, ctx)) {
+			        return LEXER_RESULT_FAIL;
+			    }
 			} else {
-				createIntegerConstantToken(token, ctx, 0, false);
+			    createIntegerConstantToken(token, ctx, 0, false);
 			}
 			break;
+			*/
 		default:
 			if (isAlphabetic(state->c)) {
 				// Keyword or Identifier
 				if (!lexWord(state, token, ctx)) {
 					return LEXER_RESULT_FAIL;
 				}
-			} else if (state->c >= '1' && state->c <= '9') {
+			} else if (isDecimalDigit(state->c)) {
 				// number
-				if (!lexNumber(state, token, ctx)) {
+				if (!lexPPNumber(state, token, ctx, true)) {
 					return LEXER_RESULT_FAIL;
 				}
 			} else {
