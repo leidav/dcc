@@ -9,7 +9,6 @@
 
 #define READ_BUFFER_SIZE 2048
 static char read_buffer[READ_BUFFER_SIZE];
-
 struct FileContext {
 	int line;
 	int column;
@@ -464,6 +463,8 @@ int initLexer(struct LexerState* state, const char* file_path)
 	memset(&state->current_pos, 0, sizeof(state->current_pos));
 	memset(&state->lookahead_pos, 0, sizeof(state->lookahead_pos));
 	state->line_beginning = true;
+	state->pp_num_definitions = 0;
+	state->pp_num_tokens = 0;
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
 		fprintf(stderr, "Could not open file\n");
@@ -477,10 +478,14 @@ int initLexer(struct LexerState* state, const char* file_path)
 	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
 		return -1;
 	}
-	if (createStringSet(&state->pp_numbers, LEXER_LITERAL_STRINGSET_SIZE,
-	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
+	if (createStringSet(&state->pp_numbers, LEXER_PP_NUMBER_STRINGSET_SIZE,
+	                    LEXER_MAX_PP_NUMBER_COUNT) != 0) {
 		return -1;
 	}
+	state->pp_tokens =
+	    malloc(sizeof(*state->pp_tokens) * LEXER_MAX_PP_NUMBER_COUNT);
+	state->pp_definitions =
+	    malloc(sizeof(*state->pp_definitions) * LEXER_MAX_DEFINITION_COUNT);
 	readInputAndHandleLineEndings(state);
 	consumeInput(state);
 	state->carriage_return = false;
@@ -508,7 +513,6 @@ static void skipWhiteSpaces(struct LexerState* state)
 	while (skipIfWhiteSpace(state)) {
 	}
 }
-
 static bool skipBackslashNewline(struct LexerState* state)
 {
 	bool success = true;
@@ -816,7 +820,7 @@ static const double exponent_lookup[] = {1e1,  1e2,  1e4, 1e8,
                                          1e16, 1e32, 1e64
 
 };
-static double exponential(int exponent)
+static double exponential(double value, int exponent)
 {
 	double factor = 1.0;
 	bool negative = exponent < 0 ? true : false;
@@ -828,10 +832,7 @@ static double exponential(int exponent)
 		}
 		exp = exp >> 1;
 	}
-	if (negative) {
-		factor = 1.0 / factor;
-	}
-	return factor;
+	return negative ? value / factor : value * factor;
 }
 
 static bool parseExponent(struct StringIterator* it, int* exponent)
@@ -861,15 +862,14 @@ static bool parseExponent(struct StringIterator* it, int* exponent)
 static bool parseFractionalNumber(struct StringIterator* it,
                                   struct LexerToken* token,
                                   const struct FileContext* ctx,
-                                  bool has_integer_part, double start)
+                                  bool has_integer_part, uint64_t start)
 {
-	double num = 0.0;
-	double factor = 1.0;
+	uint64_t num = start;
 	int length = 0;
 	char c = *it->cur;
 	while (isDecimalDigit(c)) {
-		num += (double)(c - '0');
-		num /= 10.0;
+		num *= 10;
+		num += c - '0';
 		c = next(it);
 		length++;
 	}
@@ -877,18 +877,18 @@ static bool parseFractionalNumber(struct StringIterator* it,
 		return false;
 	}
 
+	int exponent = 0;
 	if ((c == 'e') || (c == 'E')) {
 		if (length == 0) {
 			return false;
 		}
 		// exponent
 		it->cur++;
-		int exponent;
 		if (!parseExponent(it, &exponent)) {
-			return -1;
+			return false;
 		}
-		factor = exponential(exponent);
 	}
+	exponent -= length;
 	bool is_float = false;
 	c = *it->cur;
 	if (c == 'f') {
@@ -896,7 +896,7 @@ static bool parseFractionalNumber(struct StringIterator* it,
 		it->cur++;
 		is_float = true;
 	}
-	double floatingpoint = (start + num) * factor;
+	double floatingpoint = exponential(num, exponent);
 	createFloatingpointConstantToken(token, ctx, floatingpoint, is_float);
 	return true;
 }
@@ -971,7 +971,7 @@ static bool parseDecimalNumber(struct StringIterator* it,
 	if (c == '.') {
 		// floating point
 		it->cur++;
-		if (!parseFractionalNumber(it, token, ctx, true, (double)integer)) {
+		if (!parseFractionalNumber(it, token, ctx, true, integer)) {
 			return false;
 		}
 		c = *it->cur;
@@ -982,7 +982,6 @@ static bool parseDecimalNumber(struct StringIterator* it,
 		if (!parseExponent(it, &exponent)) {
 			return false;
 		}
-		double factor = exponential(exponent);
 		bool is_float = false;
 		c = *it->cur;
 		if (c == 'f') {
@@ -990,7 +989,7 @@ static bool parseDecimalNumber(struct StringIterator* it,
 			it->cur++;
 			is_float = true;
 		}
-		double floatingpoint = integer * factor;
+		double floatingpoint = exponential(integer, exponent);
 		createFloatingpointConstantToken(token, ctx, floatingpoint, is_float);
 	} else {
 		if (!parseIntegerSuffix(it, token, ctx, integer)) {
@@ -1063,7 +1062,7 @@ static bool parseNumber(struct StringIterator* it, struct LexerToken* token,
 					return false;
 				}
 			} else {
-				createSimpleToken(token, ctx, OPERATOR_POINT);
+				return false;
 			}
 			break;
 		case '0':
@@ -1515,6 +1514,16 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 	return LEXER_RESULT_SUCCESS;
 }
 
+bool handlePreprocessorDirective(struct LexerState* state)
+{
+	while (state->c != '\n') {
+		// skip preprocessor lines
+		if (!consumeLexableChar(state)) {
+			return false;
+		}
+	}
+	return true;
+}
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
 	bool success = true;
@@ -1534,12 +1543,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				success = false;
 				break;
 			}
-			while (state->c != '\n') {
-				// skip preprocessor lines
-				if (!consumeLexableChar(state)) {
-					success = false;
-					break;
-				}
+			if (!consumeLexableChar(state)) {
+				success = false;
+				break;
+			}
+			if (!handlePreprocessorDirective(state)) {
+				success = false;
+				break;
 			}
 			again = true;
 		} else {

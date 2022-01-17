@@ -4,7 +4,7 @@ keywords = [
     'int', 'long', 'register', 'restrict', 'return', 'short', 'signed',
     'sizeof', 'static', 'struct', 'switch', 'typedef', 'union', 'unsigned',
     'void', 'volatile', 'while', '_Alignas', '_Alignof', '_Bool',
-    '_Complex', '_Generic', '_Imaginary', '_Noreturn', '_Static_assert','__constexpr'
+    '_Complex', '_Generic', '_Imaginary', '_Noreturn', '_Static_assert', '__constexpr'
 ]
 
 
@@ -13,6 +13,7 @@ def djb2(string: str) -> int:
     for c in string:
         h = ((h * 33) ^ ord(c)) % (2**32)
     return h
+
 
 def main():
     for keyword in keywords:

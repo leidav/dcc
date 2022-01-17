@@ -9,3 +9,6 @@ CmakeFiles
 CMakeCache.txt
 tags
 .vscode
+.cache
+.DS_Store
+compile_commands.json
