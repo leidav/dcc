@@ -5,32 +5,32 @@
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
-const static inline bool isDecimalDigit(char c)
+const static inline bool isDecimalDigit(unsigned int c)
 {
-	return c >= '0' && c <= '9';
+	return (c - 0x30) < 10;
 }
-const static inline bool isHexDigit(char c)
+const static inline bool isHexDigit(unsigned int c)
 {
-	return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') ||
-	       (c >= '0' && c <= '9');
+	return isDecimalDigit(c) || (((c & 0xdf) - 0x41) < 6);
 }
-const static inline bool isOctalDigit(char c)
+const static inline bool isOctalDigit(unsigned int c)
 {
-	return c >= '0' && c <= '7';
-}
-
-const static inline bool isBinaryDigit(char c)
-{
-	return c == '0' || c == '1';
-}
-const static inline bool isAlphaNumeric(char c)
-{
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-	       (c >= '0' && c <= '9') || (c == '_');
+	return (c - 0x30) < 8;
 }
 
-const static inline bool isAlphabetic(char c)
+const static inline bool isBinaryDigit(unsigned int c)
 {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '_');
+	return (c - 0x30) <= 1;
+}
+
+const static inline bool isAlphabetic(unsigned int c)
+{
+	unsigned int c2 = (c & 0xdf) - 0x41;
+	return (c2 < 26) | (c2 == 30);
+}
+
+const static inline bool isAlphaNumeric(unsigned int c)
+{
+	return isAlphabetic(c) || isDecimalDigit(c);
 }
 #endif
