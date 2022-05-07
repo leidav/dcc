@@ -33,4 +33,9 @@ const static inline bool isAlphaNumeric(unsigned int c)
 {
 	return isAlphabetic(c) || isDecimalDigit(c);
 }
+
+const static inline bool isWhitespace(unsigned int c)
+{
+	return (c == 0x20) || ((c - 0x8) < 5);
+}
 #endif

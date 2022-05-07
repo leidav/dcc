@@ -2,6 +2,7 @@
 #define ALLOCATOR_H
 
 #include <stdalign.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #define ALLOCATE_TYPE(allocator, num_elements, type)                 \
@@ -12,13 +13,17 @@ struct LinearAllocator {
 	void* start;
 	void* free;
 	void* end;
+	bool memory_owned;
 };
 
 int createAllocator(struct LinearAllocator* allocator, size_t size);
 
+int createAllocatorFromBuffer(struct LinearAllocator* allocator, void* buffer,
+                              size_t size);
+
 void destroyAllocator(struct LinearAllocator* allocator);
 
-size_t markllocatorState(struct LinearAllocator* allocator);
+size_t markAllocatorState(struct LinearAllocator* allocator);
 
 void resetAllocatorState(struct LinearAllocator* allocator, size_t pos);
 

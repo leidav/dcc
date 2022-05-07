@@ -97,16 +97,49 @@ static bool compareStrings(const struct StringSetString* string,
 	return true;
 }
 
-int createStringSet(struct StringSet* stringset, size_t allocator_size,
+int createStringSet(struct StringSet* stringset, size_t string_buffer_size,
                     int max_strings)
 {
-	if (createAllocator(&stringset->string_allocator, allocator_size) != 0) {
+	if (createAllocator(&stringset->string_allocator, string_buffer_size) !=
+	    0) {
 		return -1;
 	}
+	stringset->memory_owned = true;
 	stringset->num = 0;
 	stringset->max_num = max_strings;
 	stringset->strings = malloc(sizeof(*stringset->strings) * max_strings);
 	stringset->hashes = malloc(sizeof(*stringset->hashes) * max_strings);
+	if (!stringset->strings) {
+		return -1;
+	}
+	if (!stringset->hashes) {
+		return -1;
+	}
+	return 0;
+}
+int createStringSetInBuffer(struct StringSet* stringset,
+                            size_t string_buffer_size, int max_strings,
+                            void* buffer, size_t buffer_size)
+{
+	struct LinearAllocator allocator;
+	if (createAllocatorFromBuffer(&allocator, buffer, buffer_size) != 0) {
+		return -1;
+	}
+	char* string_buffer = allocate(&allocator, string_buffer_size);
+	if (string_buffer == 0) {
+		return -1;
+	}
+	if (createAllocatorFromBuffer(&stringset->string_allocator, string_buffer,
+	                              string_buffer_size) != 0) {
+		return -1;
+	}
+	stringset->memory_owned = false;
+	stringset->num = 0;
+	stringset->max_num = max_strings;
+	stringset->strings =
+	    allocate(&allocator, sizeof(*stringset->strings) * max_strings);
+	stringset->hashes =
+	    allocate(&allocator, sizeof(*stringset->hashes) * max_strings);
 	if (!stringset->strings) {
 		return -1;
 	}
@@ -120,8 +153,10 @@ int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
                      int max_strings)
 {
 	destroyAllocator(&stringset->string_allocator);
-	free(stringset->strings);
-	free(stringset->hashes);
+	if (stringset->memory_owned) {
+		free(stringset->strings);
+		free(stringset->hashes);
+	}
 	stringset->strings = NULL;
 	stringset->hashes = NULL;
 	stringset->num = 0;
@@ -130,16 +165,23 @@ int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
 }
 
 int addStringAndHash(struct StringSet* stringset, const char* string,
-                     int length, uint32_t hash)
+                     int length, uint32_t hash, bool* exists)
 {
 	for (int i = 0; i < stringset->num; i++) {
 		if (stringset->hashes[i] == hash) {
 			if (compareStrings(&stringset->strings[i], string, length,
 			                   stringset)) {
+				if (exists != NULL) {
+					*exists = true;
+				}
 				return i;
 			}
 		}
 	}
+	if (exists != NULL) {
+		*exists = false;
+	}
+
 	if (stringset->num + 1 > stringset->max_num) {
 		return -1;
 	}
@@ -154,7 +196,7 @@ int addStringAndHash(struct StringSet* stringset, const char* string,
 int addString(struct StringSet* stringset, const char* string, int length)
 {
 	uint32_t hash = fnv1a(string, length);
-	return addStringAndHash(stringset, string, length, hash);
+	return addStringAndHash(stringset, string, length, hash, NULL);
 }
 
 const char* getStringAt(struct StringSet* stringset, int index)

@@ -17,12 +17,23 @@ int createAllocator(struct LinearAllocator* allocator, size_t size)
 	allocator->end = memory + size;
 	allocator->free = memory;
 	allocator->start = memory;
+	allocator->memory_owned = true;
+	return 0;
+}
+
+int createAllocatorFromBuffer(struct LinearAllocator* allocator, void* buffer,
+                              size_t size)
+{
+	allocator->end = buffer + size;
+	allocator->free = buffer;
+	allocator->start = buffer;
+	allocator->memory_owned = false;
 	return 0;
 }
 
 void destroyAllocator(struct LinearAllocator* allocator)
 {
-	if (allocator->start) {
+	if (allocator->memory_owned && allocator->start) {
 		free(allocator->start);
 	}
 	allocator->start = NULL;

@@ -15,20 +15,25 @@ struct StringSet {
 	uint32_t* hashes;
 	int num;
 	int max_num;
+	bool memory_owned;
 };
 
 uint32_t hashString(const char* string);
 
 uint32_t hashSubstring(const char* string, int length);
 
-int createStringSet(struct StringSet* stringset, size_t allocator_size,
+int createStringSet(struct StringSet* stringset, size_t string_buffer_size,
                     int max_strings);
+
+int createStringSetInBuffer(struct StringSet* stringset,
+                            size_t string_buffer_size, int max_strings,
+                            void* buffer, size_t buffer_size);
 
 int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
                      int max_strings);
 
 int addStringAndHash(struct StringSet* stringset, const char* string,
-                     int length, uint32_t hash);
+                     int length, uint32_t hash, bool* exists);
 
 int addString(struct StringSet* stringset, const char* string, int length);
 

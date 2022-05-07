@@ -5,16 +5,19 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "cpp.h"
 #include "input_file.h"
 #include "string_set.h"
 
 #define LEXER_IDENTIFIER_STRINGSET_SIZE (4096 << 2)
 #define LEXER_LITERAL_STRINGSET_SIZE (4096 << 3)
 #define LEXER_PP_NUMBER_STRINGSET_SIZE (4096 << 3)
+#define LEXER_MAX_DEFINITION_STRINGSET_SIZE (4096 << 3)
 
 #define LEXER_MAX_IDENTIFIER_COUNT 1024
 #define LEXER_MAX_STRING_LITERAL_COUNT 1024
 #define LEXER_MAX_PP_NUMBER_COUNT 1024
+
 #define LEXER_MAX_DEFINITION_COUNT 1024
 #define LEXER_MAX_DEFINITION_TOKEN_COUNT (4096 << 2)
 
@@ -141,6 +144,23 @@ enum TokenType {
 	TOKEN_EOF,
 	TOKEN_UNKNOWN,
 };
+
+struct LexerConstant {
+	union {
+		uint16_t string_index;
+		int character_literal;
+		uint64_t int_literal;
+		float float_literal;
+		double double_literal;
+	} value;
+};
+
+struct LexerConstantSet {
+	int num;
+	int max_count;
+	struct LexerConstant* constants;
+};
+
 struct LexerToken {
 	union {
 		uint16_t string_index;
@@ -154,39 +174,12 @@ struct LexerToken {
 	uint16_t line_pos;
 	uint8_t type;
 };
-struct LexerStoredToken {
-	uint16_t line;
-	uint16_t column;
-	uint16_t value_handle;
-	uint16_t line_pos;
-	uint8_t type;
-};
-struct LexerConstant {
-	union {
-		uint16_t string_index;
-		int character_literal;
-		uint64_t int_literal;
-		float float_literal;
-		double double_literal;
-	} value;
-};
-struct LexerConstantSet {
-	int num;
-	int max_num;
-	struct LexerConstant* constants;
-};
 
 struct LexerSourcePos {
 	int line;
 	int column;
 	int file_pos;
 	int line_pos;
-};
-struct PreprocessorDefinitionInfo {
-	uint16_t replacement_list_start;
-	uint16_t num_tokens;
-	uint16_t name_index;
-	uint8_t flags;
 };
 struct LexerState {
 	struct LexerSourcePos current_pos;
@@ -195,16 +188,14 @@ struct LexerState {
 	bool line_beginning;
 	char c;
 	char lookahead;
-	int pp_num_tokens;
-	int pp_num_definitions;
 	struct InputFile current_file;
 	struct StringSet identifiers;
 	struct StringSet string_literals;
 	struct StringSet pp_numbers;
-	struct StringSet pp_definition_names;
-	struct PreprocessorDefinitionInfo* pp_definitions;
-	struct LexerStoredToken* pp_tokens;
+	struct PreprocessorTokenSet pp_tokens;
+	struct PreprocessorDefinitionSet pp_definitions;
 	struct LexerConstantSet constants;
+	struct LinearAllocator* scratchpad;
 };
 
 int initLexer(struct LexerState* state, const char* file_path);

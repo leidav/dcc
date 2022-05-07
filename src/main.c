@@ -20,6 +20,7 @@
 
 #include "helper.h"
 #include "lexer.h"
+#include "scratchpad.h"
 
 inline static void setRedColor()
 {
@@ -68,6 +69,10 @@ int main(int argc, const char** argv)
 {
 	if (argc < 2) {
 		fprintf(stderr, "No input file specified!\n");
+		return 1;
+	}
+	if (scratchpadInit() != 0) {
+		fprintf(stderr, "Coud not initialize scrtchpad memory");
 		return 1;
 	}
 	struct LexerState lexer_state;
