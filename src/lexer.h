@@ -186,6 +186,7 @@ struct LexerState {
 	struct LexerSourcePos lookahead_pos;
 	bool carriage_return;
 	bool line_beginning;
+	bool macro_body;
 	char c;
 	char lookahead;
 	struct InputFile current_file;

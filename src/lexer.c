@@ -496,6 +496,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	readInputAndHandleLineEndings(state);
 	consumeInput(state);
 	state->carriage_return = false;
+	state->macro_body = false;
 	return 0;
 }
 static bool skipIfWhiteSpace(struct LexerState* state)
@@ -503,7 +504,11 @@ static bool skipIfWhiteSpace(struct LexerState* state)
 	bool isWhitespace;
 	if (state->c == '\n') {
 		state->line_beginning = true;
-		consumeInput(state);
+		if (state->macro_body) {
+			state->c = INPUT_EOF;
+		} else {
+			consumeInput(state);
+		}
 		isWhitespace = true;
 	} else if (state->c == ' ' || state->c == '\t') {
 		consumeInput(state);
@@ -517,7 +522,25 @@ static bool skipIfWhiteSpace(struct LexerState* state)
 }
 static void skipWhiteSpaces(struct LexerState* state)
 {
-	while (skipIfWhiteSpace(state)) {
+	while (true) {
+		while (state->c == ' ' || state->c == '\t') {
+			consumeInput(state);
+		}
+		if (state->c == '\n') {
+			state->line_beginning = true;
+			if (state->macro_body) {
+				state->c = INPUT_EOF;
+				break;
+			} else {
+				consumeInput(state);
+			}
+		} else if (state->c == '\\') {
+			if (!skipBackslashNewline(state)) {
+				break;
+			}
+		} else {
+			break;
+		}
 	}
 }
 static bool skipBackslashNewline(struct LexerState* state)
@@ -573,7 +596,12 @@ static bool skipMultiLineComment(struct LexerState* state)
 	bool success = true;
 	while (state->c != INPUT_EOF) {
 		if (state->c == '\n') {
-			consumeInput(state);
+			if (state->macro_body) {
+				state->c = INPUT_EOF;
+				break;
+			} else {
+				consumeInput(state);
+			}
 		} else if (state->c == '*') {
 			if (!consumeLexableChar(state)) {
 				return false;
@@ -598,13 +626,19 @@ static void skipSingleLineComment(struct LexerState* state)
 {
 	while (state->c != INPUT_EOF) {
 		if (state->c == '\n') {
-			consumeInput(state);
-			skipBackslashNewline(state);
+			if (state->macro_body) {
+				state->c = INPUT_EOF;
+				break;
+			} else {
+				consumeInput(state);
+				skipBackslashNewline(state);
+			}
 			break;
 		}
 		consumeInput(state);
 	}
 }
+
 static bool skipWhiteSpaceOrComments(struct LexerState* state)
 {
 	skipWhiteSpaces(state);
@@ -1557,6 +1591,38 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 	return LEXER_RESULT_SUCCESS;
 }
 
+static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
+                         char* read_buffer)
+{
+	state->macro_body = true;
+	printf("begin macro\n");
+	skipWhiteSpaceOrComments(state);
+	while (state->c != INPUT_EOF) {
+		//  skip preprocessor lines
+		if (state->c == '#') {
+			// stringify or concatenation operator
+			if (!consumeLexableChar(state)) {
+				return false;
+			}
+		} else {
+			struct LexerToken token;
+			struct FileContext macro_context;
+			getFileContext(state, &macro_context);
+			if (lexTokens(state, &token, &macro_context) !=
+			    LEXER_RESULT_SUCCESS) {
+				return false;
+			}
+			printToken(state, &token);
+			// store token
+		}
+		skipWhiteSpaceOrComments(state);
+	}
+	consumeInput(state);
+	printf("end macro\n");
+	state->macro_body = false;
+	return true;
+}
+
 static bool handleDefineDirective(struct LexerState* state,
                                   struct FileContext* ctx, char* read_buffer)
 {
@@ -1655,6 +1721,11 @@ static bool handleDefineDirective(struct LexerState* state,
 				return false;
 			}
 		}
+
+		if (!consumeLexableChar(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
 		for (int i = 0; i < params.num; i++) {
 			printf("%s,", getStringAt(&params, i));
 		}
@@ -1663,18 +1734,22 @@ static bool handleDefineDirective(struct LexerState* state,
 		resetAllocatorState(state->scratchpad, marker);
 		return false;
 	}
-	if (!skipWhiteSpaceOrComments(state)) {
+	if (!lexMacroBody(state, ctx, read_buffer)) {
 		resetAllocatorState(state->scratchpad, marker);
 		return false;
 	}
+	resetAllocatorState(state->scratchpad, marker);
+	return true;
+}
+
+static bool skipLine(struct LexerState* state)
+{
 	while (state->c != '\n') {
 		// skip preprocessor lines
 		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
 			return false;
 		}
 	}
-	resetAllocatorState(state->scratchpad, marker);
 	return true;
 }
 
@@ -1709,23 +1784,49 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 			return false;
 		}
 	} else if (strcmp("undef", read_buffer) == 0) {
-	} else if (strcmp("if", read_buffer) == 0) {
-	} else if (strcmp("ifdef", read_buffer) == 0) {
-	} else if (strcmp("ifndef", read_buffer) == 0) {
-	} else if (strcmp("elsif", read_buffer) == 0) {
-	} else if (strcmp("else", read_buffer) == 0) {
-	} else if (strcmp("endif", read_buffer) == 0) {
-	} else if (strcmp("error", read_buffer) == 0) {
-	} else {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
-	}
-	while (state->c != '\n') {
-		// skip preprocessor lines
-		if (!consumeLexableChar(state)) {
+		if (!skipLine(state)) {
 			resetAllocatorState(state->scratchpad, marker);
 			return false;
 		}
+	} else if (strcmp("if", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+	} else if (strcmp("ifdef", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+	} else if (strcmp("ifndef", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+
+	} else if (strcmp("elsif", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+	} else if (strcmp("else", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+	} else if (strcmp("endif", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+	} else if (strcmp("error", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			resetAllocatorState(state->scratchpad, marker);
+			return false;
+		}
+	} else {
+		resetAllocatorState(state->scratchpad, marker);
+		return false;
 	}
 	resetAllocatorState(state->scratchpad, marker);
 	return true;
@@ -1749,6 +1850,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				success = false;
 				break;
 			}
+			state->line_beginning = false;
 			if (!consumeLexableChar(state)) {
 				success = false;
 				break;
@@ -1759,12 +1861,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			}
 			again = true;
 		} else {
+			state->line_beginning = false;
 			if (lexTokens(state, token, &ctx) != LEXER_RESULT_SUCCESS) {
 				success = false;
 				break;
 			}
 		}
 	}
-	state->line_beginning = false;
+
 	return success;
 }
