@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "error.h"
 #include "helper.h"
 #include "keyword_hashes.h"
 #include "scratchpad.h"
@@ -11,6 +12,12 @@
 #define MAX_STRING_LENGTH 2048
 #define MAX_PP_NUMBER_LENGTH 1024
 #define MAX_IDENTIFIER_LENGTH 256
+
+#define NEXT(state)                      \
+	(if (!consumeLexableChar(state)) {   \
+		unexpectedCharacterError(state); \
+		return false;                    \
+	})
 
 struct FileContext {
 	int line;
@@ -1627,7 +1634,6 @@ static bool handleDefineDirective(struct LexerState* state,
                                   struct FileContext* ctx, char* read_buffer)
 {
 	char macro_name[256];
-
 	if (!skipWhiteSpaceOrComments(state)) {
 		return false;
 	}
@@ -1650,96 +1656,83 @@ static bool handleDefineDirective(struct LexerState* state,
 		return false;
 	}
 
+	bool status = false;
 	if (createStringSetInBuffer(&params, 256, 64, buffer, 1024) != 0) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
+
 	if (state->c == '(') {
 		// Function like macro
 
 		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 		if (!skipWhiteSpaceOrComments(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 		if (isAlphabetic(state->c)) {
 			int len = readWord(state, ctx, read_buffer);
 			if (len < 0) {
-				resetAllocatorState(state->scratchpad, marker);
-				return false;
+				goto out;
 			}
 			uint32_t hash = hashSubstring(read_buffer, len);
 			addStringAndHash(&params, read_buffer, len, hash, &exists);
 			if (exists == true) {
-				resetAllocatorState(state->scratchpad, marker);
-				return false;
+				goto out;
 			}
 			if (!skipWhiteSpaceOrComments(state)) {
-				resetAllocatorState(state->scratchpad, marker);
-				return false;
+				goto out;
 			}
 			while (state->c != ')') {
 				if (state->c == ',') {
 					if (!consumeLexableChar(state)) {
-						resetAllocatorState(state->scratchpad, marker);
-						return false;
+						goto out;
 					}
 					if (!skipWhiteSpaceOrComments(state)) {
-						resetAllocatorState(state->scratchpad, marker);
-						return false;
+						goto out;
 					}
 					if (!isAlphabetic(state->c)) {
-						resetAllocatorState(state->scratchpad, marker);
-						return false;
+						goto out;
 					}
 					int len = readWord(state, ctx, read_buffer);
 					if (len < 0) {
-						resetAllocatorState(state->scratchpad, marker);
-						return false;
+						goto out;
 					}
 					uint32_t hash = hashSubstring(read_buffer, len);
 					addStringAndHash(&params, read_buffer, len, hash, &exists);
-					if (exists == true) {
-						resetAllocatorState(state->scratchpad, marker);
-						return false;
+					if (exists) {
+						goto out;
 					}
 					if (!skipWhiteSpaceOrComments(state)) {
-						resetAllocatorState(state->scratchpad, marker);
-						return false;
+						goto out;
 					}
 				} else {
-					resetAllocatorState(state->scratchpad, marker);
-					return false;
+					goto out;
 				}
 			}
 		} else {
 			if (state->c != ')') {
-				resetAllocatorState(state->scratchpad, marker);
-				return false;
+				goto out;
 			}
 		}
 
 		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 		for (int i = 0; i < params.num; i++) {
 			printf("%s,", getStringAt(&params, i));
 		}
 		printf("\n");
 	} else if (!isWhitespace(state->c)) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 	if (!lexMacroBody(state, ctx, read_buffer)) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
+	status = true;
+out:
 	resetAllocatorState(state->scratchpad, marker);
-	return true;
+	return status;
 }
 
 static bool skipLine(struct LexerState* state)
@@ -1757,83 +1750,72 @@ static bool handlePreprocessorDirective(struct LexerState* state,
                                         struct FileContext* ctx)
 
 {
+	bool status = false;
 	size_t marker = markAllocatorState(state->scratchpad);
 	char* read_buffer = allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 
 	if (!skipWhiteSpaceOrComments(state)) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 	if (!isAlphabetic(state->c)) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 	int len = readWord(state, ctx, read_buffer);
 	if (len < 0) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 	if (strcmp("include", read_buffer) == 0) {
 	} else if (strcmp("define", read_buffer) == 0) {
 		if (!handleDefineDirective(state, ctx, read_buffer)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("undef", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("if", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("ifdef", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("ifndef", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 
 	} else if (strcmp("elsif", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("else", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("endif", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else if (strcmp("error", read_buffer) == 0) {
 		if (!skipLine(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 	} else {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
+	status = true;
+out:
 	resetAllocatorState(state->scratchpad, marker);
-	return true;
+	return status;
 }
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
-	bool success = true;
+	bool status = true;
 	bool again = true;
 	while (again) {
 		again = false;
@@ -1847,27 +1829,27 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 		} else if (state->c == '#') {
 			// preprocessor
 			if (!state->line_beginning) {
-				success = false;
+				status = false;
 				break;
 			}
 			state->line_beginning = false;
 			if (!consumeLexableChar(state)) {
-				success = false;
+				status = false;
 				break;
 			}
 			if (!handlePreprocessorDirective(state, &ctx)) {
-				success = false;
+				status = false;
 				break;
 			}
 			again = true;
 		} else {
 			state->line_beginning = false;
 			if (lexTokens(state, token, &ctx) != LEXER_RESULT_SUCCESS) {
-				success = false;
+				status = false;
 				break;
 			}
 		}
 	}
 
-	return success;
+	return status;
 }

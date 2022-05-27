@@ -17,5 +17,7 @@ target_sources(
   "${CMAKE_CURRENT_SOURCE_DIR}/allocator.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/scratchpad.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/scratchpad.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/error.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/error.h"
 )
 target_compile_features(dcc PRIVATE c_std_11)
