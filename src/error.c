@@ -49,6 +49,10 @@ static void printErrorLine(int line_pos, int column, const char* file_path)
 
 void lexerError(struct LexerState* state, const char* reason)
 {
+	if (state->error_handled) {
+		return;
+	}
+	state->error_handled = true;
 	setRedColor();
 	fprintf(stderr, "Lexer error ");
 	resetColor();
@@ -65,4 +69,8 @@ void lexerError(struct LexerState* state, const char* reason)
 		printErrorLine(state->current_pos.line_pos, state->current_pos.column,
 		               state->current_file.name);
 	}
+}
+void generalError(const char* reason)
+{
+	fprintf(stderr, "%s\n", reason);
 }

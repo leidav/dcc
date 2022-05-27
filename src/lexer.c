@@ -13,11 +13,10 @@
 #define MAX_PP_NUMBER_LENGTH 1024
 #define MAX_IDENTIFIER_LENGTH 256
 
-#define NEXT(state)                      \
-	(if (!consumeLexableChar(state)) {   \
-		unexpectedCharacterError(state); \
-		return false;                    \
-	})
+#define NEXT(lexer_state, out_label)        \
+	if (!consumeLexableChar(lexer_state)) { \
+		goto out_label;                     \
+	}
 
 struct FileContext {
 	int line;
@@ -504,6 +503,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	consumeInput(state);
 	state->carriage_return = false;
 	state->macro_body = false;
+	state->error_handled = false;
 	return 0;
 }
 static bool skipIfWhiteSpace(struct LexerState* state)
@@ -569,7 +569,6 @@ static bool skipBackslashNewline(struct LexerState* state)
 }
 static bool skipBackslashNewlineLookahead(struct LexerState* state)
 {
-	bool success = true;
 	while (state->lookahead == '\\') {
 		state->lookahead_pos.column++;
 		readInputAndHandleLineEndings(state);
@@ -582,11 +581,11 @@ static bool skipBackslashNewlineLookahead(struct LexerState* state)
 			state->lookahead_pos.line++;
 			readInputAndHandleLineEndings(state);
 		} else {
-			success = false;
-			break;
+			lexerError(state, "Newline character expected");
+			return false;
 		}
 	}
-	return success;
+	return true;
 }
 
 static bool consumeLexableChar(struct LexerState* state)
@@ -600,7 +599,7 @@ static bool consumeLexableChar(struct LexerState* state)
 
 static bool skipMultiLineComment(struct LexerState* state)
 {
-	bool success = true;
+	bool status = false;
 	while (state->c != INPUT_EOF) {
 		if (state->c == '\n') {
 			if (state->macro_body) {
@@ -610,13 +609,9 @@ static bool skipMultiLineComment(struct LexerState* state)
 				consumeInput(state);
 			}
 		} else if (state->c == '*') {
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			NEXT(state, out);
 			if (state->c == '/') {
-				if (!consumeLexableChar(state)) {
-					return false;
-				}
+				NEXT(state, out);
 				break;
 			}
 		} else {
@@ -624,9 +619,10 @@ static bool skipMultiLineComment(struct LexerState* state)
 		}
 	}
 	if (state->c == INPUT_EOF) {
-		success = false;
+		status = false;
 	}
-	return success;
+out:
+	return status;
 }
 
 static void skipSingleLineComment(struct LexerState* state)
@@ -782,30 +778,28 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	if (!read_buffer) {
 		return false;
 	}
+	bool status = false;
 	while (true) {
 		length = lexStringLiteralPiece(length, state, read_buffer);
 		if (length < 0) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 		if (!skipWhiteSpaceOrComments(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			goto out;
 		}
 		if (state->c != '"') {
 			break;
 		}
-		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
-		}
+		NEXT(state, out);
 	}
 	read_buffer[length] = 0;
 	int index = addString(&state->string_literals, read_buffer, length);
 	if (index == -1) {
-		return false;
+		goto out;
 	}
 	createStringConstantToken(token, ctx, index);
+	status = true;
+out:
 	resetAllocatorState(state->scratchpad, marker);
 	return true;
 }
@@ -1182,79 +1176,66 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
                         bool create_number_constant)
 {
 	size_t marker = markAllocatorState(state->scratchpad);
+	bool status = false;
 	char* read_buffer = allocate(state->scratchpad, MAX_PP_NUMBER_LENGTH);
 	if (!read_buffer) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 	int length = 0;
 	if (state->c == '.') {
 		read_buffer[length] = state->c;
 		length++;
-		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
-		}
+		NEXT(state, out);
 	}
 	while (isDecimalDigit(state->c)) {
 		read_buffer[length] = state->c;
 		length++;
-		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
-		}
+		NEXT(state, out);
 	}
 	while (isAlphaNumeric(state->c) || state->c == '.') {
 		read_buffer[length] = state->c;
 		length++;
 		if ((state->c == 'e') || (state->c == 'E')) {
 			if ((state->lookahead == '-') || (state->lookahead == '+')) {
-				if (!consumeLexableChar(state)) {
-					resetAllocatorState(state->scratchpad, marker);
-					return false;
-				}
+				NEXT(state, out);
 				read_buffer[length] = state->c;
 				length++;
 			}
 		}
-		if (!consumeLexableChar(state)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
-		}
+		NEXT(state, out);
 	}
 	read_buffer[length] = 0;
 	if (create_number_constant) {
 		struct StringIterator it;
 		initStringIterator(&it, read_buffer);
 		if (!parseNumber(&it, token, ctx)) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			lexerError(state, "Invalid number");
+			goto out;
 		}
 	} else {
 		int index = addString(&state->pp_numbers, read_buffer, length);
 		if (index == -1) {
-			resetAllocatorState(state->scratchpad, marker);
-			return false;
+			generalError("Could not allocate string");
+			goto out;
 		}
 		createPPNumberToken(token, ctx, index);
 	}
+	status = true;
+out:
 	resetAllocatorState(state->scratchpad, marker);
-	return true;
+	return status;
 }
 
-int lexTokens(struct LexerState* state, struct LexerToken* token,
-              const struct FileContext* ctx)
+bool lexTokens(struct LexerState* state, struct LexerToken* token,
+               const struct FileContext* ctx)
 {
+	bool status = false;
 	switch (state->c) {
 		case '/':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Divison Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_DIV_ASSIGNMENT);
 			} else {
 				//  Division Operator
@@ -1262,14 +1243,10 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '*':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Multiplication Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_MUL_ASSIGNMENT);
 			} else {
 				// ASTERISC
@@ -1278,14 +1255,10 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			break;
 
 		case '%':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Modulo Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_MODULO_ASSIGNMENT);
 			} else {
 				// Modulo Operator
@@ -1293,20 +1266,14 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '+':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Plus Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_PLUS_ASSIGNMENT);
 			} else if (state->c == '+') {
 				// PlusPlus Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_PLUSPLUS);
 			} else {
 				// Plus Operator
@@ -1314,26 +1281,18 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '-':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Minus Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_MINUS_ASSIGNMENT);
 			} else if (state->c == '-') {
 				// MinusMinus Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_MINUSMINUS);
 			} else if (state->c == '>') {
 				// Dereference Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_DEREFERENCE);
 			} else {
 				// Minus Operator
@@ -1341,20 +1300,14 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '&':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// And Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_AND_ASSIGNMENT);
 			} else if (state->c == '&') {
 				// Logical And Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_LOGICAL_AND);
 			} else {
 				// And Operator
@@ -1362,20 +1315,14 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '|':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Or Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_OR_ASSIGNMENT);
 			} else if (state->c == '|') {
 				// Logical Or Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_LOGICAL_OR);
 			} else {
 				// Or Operator
@@ -1383,14 +1330,10 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '^':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Xor Assignment Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_XOR_ASSIGNMENT);
 			} else {
 				// Xor Operator
@@ -1399,21 +1342,15 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			break;
 
 		case '~':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			// Negate Operator
 			createSimpleToken(token, ctx, OPERATOR_NEGATE);
 			break;
 		case '!':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Not Equal Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_NOT_EQUAL);
 			} else {
 				// Logical Not Operator
@@ -1421,18 +1358,12 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '<':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '<') {
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				if (state->c == '=') {
 					// Shift left Assignment Operator
-					if (!consumeLexableChar(state)) {
-						return LEXER_RESULT_FAIL;
-					}
+					NEXT(state, out);
 					createSimpleToken(token, ctx,
 					                  OPERATOR_SHIFT_LEFT_ASSIGNMENT);
 				} else {
@@ -1441,9 +1372,7 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 				}
 			} else if (state->c == '=') {
 				// Less or equal Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_LESS_OR_EQUAL);
 			} else {
 				// Less than Operator
@@ -1451,18 +1380,12 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '>':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '>') {
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				if (state->c == '=') {
 					// Shift right Assignment Operator
-					if (!consumeLexableChar(state)) {
-						return LEXER_RESULT_FAIL;
-					}
+					NEXT(state, out);
 					createSimpleToken(token, ctx,
 					                  OPERATOR_SHIFT_RIGHT_ASSIGNMENT);
 				} else {
@@ -1471,9 +1394,7 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 				}
 			} else if (state->c == '=') {
 				// Greater or equal Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_GREATER_OR_EQUAL);
 			} else {
 				// Greater than Operator
@@ -1481,14 +1402,10 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '=':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			if (state->c == '=') {
 				// Equal Comparsion Operator
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_EQUAL);
 			} else {
 				// Assignment Operator
@@ -1496,85 +1413,63 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			}
 			break;
 		case '?':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, OPERATOR_CONDITIONAL);
 			break;
 		case ':':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, COLON);
 			break;
 		case ';':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, SEMICOLON);
 			break;
 		case ',':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, COMMA);
 		case '(':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, PARENTHESE_LEFT);
 			break;
 		case ')':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, PARENTHESE_RIGHT);
 			break;
 		case '[':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, BRACKET_LEFT);
 			break;
 		case ']':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, BRACKET_RIGHT);
 			break;
 		case '{':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, BRACE_LEFT);
 			break;
 		case '}':
-			if (!consumeLexableChar(state)) {
-				return LEXER_RESULT_FAIL;
-			}
+			NEXT(state, out);
 			createSimpleToken(token, ctx, BRACE_RIGHT);
 			break;
 		case '"':
 			consumeInput(state);
 			if (!lexStringLiteral(state, token, ctx)) {
-				return LEXER_RESULT_FAIL;
+				goto out;
 			}
 			break;
 		case '\'':
 			consumeInput(state);
 			if (!lexCharacterLiteral(state, token, ctx)) {
-				return LEXER_RESULT_FAIL;
+				goto out;
 			}
 			break;
 		case '.':
 			if (isDecimalDigit(state->lookahead)) {
 				if (!lexPPNumber(state, token, ctx, true)) {
-					return LEXER_RESULT_FAIL;
+					goto out;
 				}
 			} else {
-				if (!consumeLexableChar(state)) {
-					return LEXER_RESULT_FAIL;
-				}
+				NEXT(state, out);
 				createSimpleToken(token, ctx, OPERATOR_POINT);
 			}
 			break;
@@ -1582,25 +1477,29 @@ int lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (isAlphabetic(state->c)) {
 				// Keyword or Identifier
 				if (!lexWord(state, token, ctx)) {
-					return LEXER_RESULT_FAIL;
+					goto out;
 				}
 			} else if (isDecimalDigit(state->c)) {
 				// number
 				if (!lexPPNumber(state, token, ctx, true)) {
-					return LEXER_RESULT_FAIL;
+					goto out;
 				}
 			} else {
 				createSimpleToken(token, ctx, TOKEN_UNKNOWN);
-				return LEXER_RESULT_FAIL;
+				unexpectedCharacterError(state);
+				goto out;
 			}
 			break;
 	}
-	return LEXER_RESULT_SUCCESS;
+	status = true;
+out:
+	return status;
 }
 
 static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
                          char* read_buffer)
 {
+	bool status = false;
 	state->macro_body = true;
 	printf("begin macro\n");
 	skipWhiteSpaceOrComments(state);
@@ -1608,16 +1507,13 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 		//  skip preprocessor lines
 		if (state->c == '#') {
 			// stringify or concatenation operator
-			if (!consumeLexableChar(state)) {
-				return false;
-			}
+			NEXT(state, out);
 		} else {
 			struct LexerToken token;
 			struct FileContext macro_context;
 			getFileContext(state, &macro_context);
-			if (lexTokens(state, &token, &macro_context) !=
-			    LEXER_RESULT_SUCCESS) {
-				return false;
+			if (!lexTokens(state, &token, &macro_context)) {
+				goto out;
 			}
 			printToken(state, &token);
 			// store token
@@ -1626,8 +1522,10 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 	}
 	consumeInput(state);
 	printf("end macro\n");
+	status = true;
+out:
 	state->macro_body = false;
-	return true;
+	return status;
 }
 
 static bool handleDefineDirective(struct LexerState* state,
@@ -1638,10 +1536,12 @@ static bool handleDefineDirective(struct LexerState* state,
 		return false;
 	}
 	if (!isAlphabetic(state->c)) {
+		lexerError(state, "Valid macro name expected");
 		return false;
 	}
 	int macro_name_length = readWord(state, ctx, read_buffer);
 	if (macro_name_length <= 0 || macro_name_length > 255) {
+		lexerError(state, "macro name is to long");
 		return false;
 	}
 	printf("%s ", read_buffer);
@@ -1664,15 +1564,14 @@ static bool handleDefineDirective(struct LexerState* state,
 	if (state->c == '(') {
 		// Function like macro
 
-		if (!consumeLexableChar(state)) {
-			goto out;
-		}
+		NEXT(state, out);
 		if (!skipWhiteSpaceOrComments(state)) {
 			goto out;
 		}
 		if (isAlphabetic(state->c)) {
 			int len = readWord(state, ctx, read_buffer);
 			if (len < 0) {
+				lexerError(state, "identifier is to long");
 				goto out;
 			}
 			uint32_t hash = hashSubstring(read_buffer, len);
@@ -1685,9 +1584,7 @@ static bool handleDefineDirective(struct LexerState* state,
 			}
 			while (state->c != ')') {
 				if (state->c == ',') {
-					if (!consumeLexableChar(state)) {
-						goto out;
-					}
+					NEXT(state, out);
 					if (!skipWhiteSpaceOrComments(state)) {
 						goto out;
 					}
@@ -1716,9 +1613,7 @@ static bool handleDefineDirective(struct LexerState* state,
 			}
 		}
 
-		if (!consumeLexableChar(state)) {
-			goto out;
-		}
+		NEXT(state, out);
 		for (int i = 0; i < params.num; i++) {
 			printf("%s,", getStringAt(&params, i));
 		}
@@ -1754,6 +1649,7 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 	size_t marker = markAllocatorState(state->scratchpad);
 	char* read_buffer = allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
+		generalError("Memory allocation failed");
 		goto out;
 	}
 
@@ -1761,13 +1657,18 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 		goto out;
 	}
 	if (!isAlphabetic(state->c)) {
+		lexerError(state, "Preprocessor directive expected");
 		goto out;
 	}
 	int len = readWord(state, ctx, read_buffer);
 	if (len < 0) {
+		lexerError(state, "Identifier is to long");
 		goto out;
 	}
 	if (strcmp("include", read_buffer) == 0) {
+		if (!skipLine(state)) {
+			goto out;
+		}
 	} else if (strcmp("define", read_buffer) == 0) {
 		if (!handleDefineDirective(state, ctx, read_buffer)) {
 			goto out;
@@ -1806,6 +1707,7 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 			goto out;
 		}
 	} else {
+		lexerError(state, "unknown preprocessor directive");
 		goto out;
 	}
 	status = true;
@@ -1815,7 +1717,7 @@ out:
 }
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
-	bool status = true;
+	bool status = false;
 	bool again = true;
 	while (again) {
 		again = false;
@@ -1830,13 +1732,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			// preprocessor
 			if (!state->line_beginning) {
 				status = false;
-				break;
+				lexerError(state,
+				           "Preprocessor definitions must start at the "
+				           "beginning of a line");
+				goto out;
 			}
 			state->line_beginning = false;
-			if (!consumeLexableChar(state)) {
-				status = false;
-				break;
-			}
+			NEXT(state, out);
 			if (!handlePreprocessorDirective(state, &ctx)) {
 				status = false;
 				break;
@@ -1844,12 +1746,10 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			again = true;
 		} else {
 			state->line_beginning = false;
-			if (lexTokens(state, token, &ctx) != LEXER_RESULT_SUCCESS) {
-				status = false;
-				break;
-			}
+			status = lexTokens(state, token, &ctx);
 		}
 	}
-
+	status = true;
+out:
 	return status;
 }

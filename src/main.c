@@ -43,7 +43,8 @@ int main(int argc, const char** argv)
 		struct LexerToken token;
 		validInput = getNextToken(&lexer_state, &token);
 		if (!validInput) {
-			unexpectedCharacterError(&lexer_state);
+			lexerError(&lexer_state,
+			           "An unexpected error happened during lexing");
 		} else {
 			printToken(&lexer_state, &token);
 		}
