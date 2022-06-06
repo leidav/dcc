@@ -15,6 +15,13 @@ inline static void setRedColor()
 	}
 }
 
+inline static void setYellowColor()
+{
+	if (isatty(STDERR_FILENO)) {
+		fprintf(stderr, "\e[33m");
+	}
+}
+
 inline static void resetColor()
 {
 	if (isatty(STDERR_FILENO)) {
@@ -72,5 +79,12 @@ void lexerError(struct LexerState* state, const char* reason)
 }
 void generalError(const char* reason)
 {
-	fprintf(stderr, "%s\n", reason);
+	fprintf(stderr, "Error: %s\n", reason);
+}
+
+void generalWarning(const char* reason)
+{
+	setYellowColor();
+	fprintf(stderr, "Warning: %s\n", reason);
+	resetColor();
 }

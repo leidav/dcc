@@ -203,3 +203,17 @@ const char* getStringAt(struct StringSet* stringset, int index)
 {
 	return getString(&stringset->strings[index], &stringset->string_allocator);
 }
+
+int findIndex(struct StringSet* stringset, const char* string, int length,
+              uint32_t hash)
+{
+	for (int i = 0; i < stringset->num; i++) {
+		if (stringset->hashes[i] == hash) {
+			if (compareStrings(&stringset->strings[i], string, length,
+			                   stringset)) {
+				return i;
+			}
+		}
+	}
+	return -1;
+}

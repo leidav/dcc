@@ -38,4 +38,7 @@ const static inline bool isWhitespace(unsigned int c)
 {
 	return (c == 0x20) || ((c - 0x8) < 5);
 }
+
+const char* fileName(const char* path);
+
 #endif

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cpp.h"
 #include "error.h"
 #include "helper.h"
 #include "keyword_hashes.h"
@@ -54,6 +55,36 @@ static void setFileContext(struct LexerState* state,
 	state->current_pos.column = ctx->column;
 	state->current_pos.line_pos = ctx->line_pos;
 }
+struct LexerToken createLexerTokenFromPPToken(
+    struct LexerState* state, struct PreprocessorToken* pp_token)
+{
+	struct LexerToken token;
+	token.type = pp_token->type;
+	token.line = pp_token->line;
+	token.column = pp_token->column;
+	token.line_pos = pp_token->line_pos;
+	if (pp_token->type == LITERAL_STRING) {
+		token.value.string_index = pp_token->value_handle;
+	} else if (pp_token->type >= CONSTANT_CHAR &&
+	           pp_token->type <= CONSTANT_DOUBLE) {
+		token.value = state->constants.constants[pp_token->value_handle];
+	} else if (pp_token->type == PP_PARAM) {
+		token.value.param_index = pp_token->value_handle;
+	}
+	return token;
+}
+
+static int createPPParamRefToken(struct LexerToken* token,
+                                 const struct FileContext* ctx, int param)
+{
+	token->line = ctx->line;
+	token->type = PP_PARAM;
+	token->column = ctx->column;
+	token->line_pos = ctx->line_pos;
+	token->value.param_index = param;
+	token->literal = false;
+	return 0;
+}
 
 static int createSimpleToken(struct LexerToken* token,
                              const struct FileContext* ctx, enum TokenType type)
@@ -62,6 +93,7 @@ static int createSimpleToken(struct LexerToken* token,
 	token->column = ctx->column;
 	token->type = type;
 	token->line_pos = ctx->line_pos;
+	token->literal = false;
 	return 0;
 }
 
@@ -78,6 +110,7 @@ static int createIntegerConstantToken(struct LexerToken* token,
 		token->type = CONSTANT_INT;
 	}
 	token->value.int_literal = number;
+	token->literal = true;
 	return 0;
 }
 
@@ -95,6 +128,7 @@ static int createFloatingpointConstantToken(struct LexerToken* token,
 		token->type = CONSTANT_DOUBLE;
 		token->value.double_literal = number;
 	}
+	token->literal = true;
 	return 0;
 }
 
@@ -106,6 +140,7 @@ static int createIdentifierToken(struct LexerToken* token,
 	token->line_pos = ctx->line_pos;
 	token->type = IDENTIFIER;
 	token->value.string_index = index;
+	token->literal = false;
 	return 0;
 }
 
@@ -118,6 +153,7 @@ static int createStringConstantToken(struct LexerToken* token,
 	token->line_pos = ctx->line_pos;
 	token->type = LITERAL_STRING;
 	token->value.string_index = index;
+	token->literal = true;
 	return 0;
 }
 static int createCharacterConstantToken(struct LexerToken* token,
@@ -129,6 +165,7 @@ static int createCharacterConstantToken(struct LexerToken* token,
 	token->line_pos = ctx->line_pos;
 	token->type = CONSTANT_CHAR;
 	token->value.character_literal = character;
+	token->literal = true;
 	return 0;
 }
 
@@ -140,6 +177,7 @@ static int createPPNumberToken(struct LexerToken* token,
 	token->line_pos = ctx->line_pos;
 	token->type = PP_NUMBER;
 	token->value.string_index = index;
+	token->literal = true;
 	return 0;
 }
 
@@ -411,21 +449,6 @@ static bool matchKeyword(const char* buffer, uint32_t buffer_hash,
 	return false;
 }
 
-static const char* fileName(const char* path)
-{
-	int last_seperator = -1;
-	int i = 0;
-	const char* ptr = path;
-	while (*ptr) {
-		if (*ptr == '/') {
-			last_seperator = i;
-		}
-		ptr++;
-		i++;
-	}
-	return &path[last_seperator + 1];
-}
-
 static void readInputAndHandleLineEndings(struct LexerState* state)
 {
 	// support unix, dos and legacy mac text files
@@ -497,6 +520,13 @@ int initLexer(struct LexerState* state, const char* file_path)
 	if (createPreprocessorDefinitionSet(&state->pp_definitions,
 	                                    LEXER_MAX_DEFINITION_COUNT,
 	                                    LEXER_PP_NUMBER_STRINGSET_SIZE) != 0) {
+		return -1;
+	}
+	state->constants.num = 0;
+	state->constants.max_count = LEXER_MAX_PP_CONSTANT_COUNT;
+	state->constants.constants = malloc(sizeof(*state->constants.constants) *
+	                                    LEXER_MAX_PP_CONSTANT_COUNT);
+	if (state->constants.constants == NULL) {
 		return -1;
 	}
 	readInputAndHandleLineEndings(state);
@@ -619,6 +649,7 @@ static bool skipMultiLineComment(struct LexerState* state)
 		}
 	}
 	if (state->c == INPUT_EOF) {
+		lexerError(state, "New line expected but end of file reached instead");
 		status = false;
 	}
 out:
@@ -795,6 +826,7 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	read_buffer[length] = 0;
 	int index = addString(&state->string_literals, read_buffer, length);
 	if (index == -1) {
+		generalError("Could not allocate string");
 		goto out;
 	}
 	createStringConstantToken(token, ctx, index);
@@ -858,28 +890,41 @@ static int readWord(struct LexerState* state, const struct FileContext* ctx,
 	return length;
 }
 
+static bool createKeywordOrIdentifierToken(struct LexerState* state,
+                                           struct LexerToken* token,
+                                           const struct FileContext* ctx,
+                                           const char* string, int length)
+{
+	uint32_t hash = hashString(string);
+	if (!matchKeyword(string, hash, ctx, token)) {
+		int index =
+		    addStringAndHash(&state->identifiers, string, length, hash, NULL);
+		if (index < 0) {
+			return false;
+		}
+		createIdentifierToken(token, ctx, index);
+	}
+	return true;
+}
+
 static bool lexWord(struct LexerState* state, struct LexerToken* token,
                     const struct FileContext* ctx)
 {
+	bool status = false;
 	size_t marker = markAllocatorState(state->scratchpad);
 	char* read_buffer = allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
 	int length = readWord(state, ctx, read_buffer);
 	if (length < 0) {
-		resetAllocatorState(state->scratchpad, marker);
-		return false;
+		goto out;
 	}
-	uint32_t hash = hashString(read_buffer);
-	if (!matchKeyword(read_buffer, hash, ctx, token)) {
-		int string = addStringAndHash(&state->identifiers, read_buffer, length,
-		                              hash, NULL);
-		createIdentifierToken(token, ctx, string);
-	}
+	status =
+	    createKeywordOrIdentifierToken(state, token, ctx, read_buffer, length);
+out:
 	resetAllocatorState(state->scratchpad, marker);
-	return true;
+	return status;
 }
 static const double exponent_lookup[] = {1e1,  1e2,  1e4, 1e8,
                                          1e16, 1e32, 1e64
@@ -1179,6 +1224,7 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
 	bool status = false;
 	char* read_buffer = allocate(state->scratchpad, MAX_PP_NUMBER_LENGTH);
 	if (!read_buffer) {
+		generalError("buffer allocation failed");
 		goto out;
 	}
 	int length = 0;
@@ -1215,7 +1261,7 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
 	} else {
 		int index = addString(&state->pp_numbers, read_buffer, length);
 		if (index == -1) {
-			generalError("Could not allocate string");
+			generalError("Could not allocate the pp-number string");
 			goto out;
 		}
 		createPPNumberToken(token, ctx, index);
@@ -1454,12 +1500,14 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 		case '"':
 			consumeInput(state);
 			if (!lexStringLiteral(state, token, ctx)) {
+				lexerError(state, "Invalid string literal");
 				goto out;
 			}
 			break;
 		case '\'':
 			consumeInput(state);
 			if (!lexCharacterLiteral(state, token, ctx)) {
+				lexerError(state, "Invalid character literal");
 				goto out;
 			}
 			break;
@@ -1497,31 +1545,60 @@ out:
 }
 
 static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
-                         char* read_buffer)
+                         const char* macro_name, int macro_name_length,
+                         bool function_like, struct StringSet* params)
 {
 	bool status = false;
 	state->macro_body = true;
-	printf("begin macro\n");
 	skipWhiteSpaceOrComments(state);
+
+	int start_index = state->pp_tokens.num;
+	int num = 0;
 	while (state->c != INPUT_EOF) {
+		struct LexerToken token;
+		struct FileContext macro_context;
+		getFileContext(state, &macro_context);
 		//  skip preprocessor lines
 		if (state->c == '#') {
 			// stringify or concatenation operator
 			NEXT(state, out);
+		} else if (function_like && isAlphabetic(state->c)) {
+			size_t marker = markAllocatorState(state->scratchpad);
+			char* read_buffer =
+			    allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
+			if (read_buffer == NULL) {
+				goto out;
+			}
+			int length = readWord(state, &macro_context, read_buffer);
+			if (length == 0) {
+				resetAllocatorState(state->scratchpad, marker);
+				goto out;
+			}
+			uint32_t hash = hashSubstring(read_buffer, length);
+			int index = findIndex(params, read_buffer, length, hash);
+			if (index >= 0) {
+				createPPParamRefToken(&token, &macro_context, index);
+			} else {
+				createKeywordOrIdentifierToken(state, &token, &macro_context,
+				                               read_buffer, length);
+			}
+			//    store token
+			addPreprocessorToken(state, &token);
+			num++;
+			resetAllocatorState(state->scratchpad, marker);
 		} else {
-			struct LexerToken token;
-			struct FileContext macro_context;
-			getFileContext(state, &macro_context);
 			if (!lexTokens(state, &token, &macro_context)) {
 				goto out;
 			}
-			printToken(state, &token);
-			// store token
+			//  store token
+			addPreprocessorToken(state, &token);
+			num++;
 		}
 		skipWhiteSpaceOrComments(state);
 	}
 	consumeInput(state);
-	printf("end macro\n");
+	createPreprocessorDefinition(state, start_index, num, params->num,
+	                             macro_name, macro_name_length, function_like);
 	status = true;
 out:
 	state->macro_body = false;
@@ -1544,7 +1621,6 @@ static bool handleDefineDirective(struct LexerState* state,
 		lexerError(state, "macro name is to long");
 		return false;
 	}
-	printf("%s ", read_buffer);
 	memcpy(macro_name, read_buffer, macro_name_length + 1);
 
 	struct StringSet params;
@@ -1556,13 +1632,14 @@ static bool handleDefineDirective(struct LexerState* state,
 		return false;
 	}
 
+	bool function_like = false;
 	bool status = false;
 	if (createStringSetInBuffer(&params, 256, 64, buffer, 1024) != 0) {
 		goto out;
 	}
-
 	if (state->c == '(') {
 		// Function like macro
+		function_like = true;
 
 		NEXT(state, out);
 		if (!skipWhiteSpaceOrComments(state)) {
@@ -1614,14 +1691,11 @@ static bool handleDefineDirective(struct LexerState* state,
 		}
 
 		NEXT(state, out);
-		for (int i = 0; i < params.num; i++) {
-			printf("%s,", getStringAt(&params, i));
-		}
-		printf("\n");
 	} else if (!isWhitespace(state->c)) {
 		goto out;
 	}
-	if (!lexMacroBody(state, ctx, read_buffer)) {
+	if (!lexMacroBody(state, ctx, macro_name, macro_name_length, function_like,
+	                  &params)) {
 		goto out;
 	}
 	status = true;
@@ -1707,7 +1781,7 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 			goto out;
 		}
 	} else {
-		lexerError(state, "unknown preprocessor directive");
+		lexerError(state, "Unknown preprocessor directive");
 		goto out;
 	}
 	status = true;

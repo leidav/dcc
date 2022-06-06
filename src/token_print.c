@@ -112,7 +112,9 @@ static const char* getTokenName(enum TokenType type)
 		RETURN_AS_STRING_IF_MATCH(CONSTANT_UNSIGNED_INT)
 		RETURN_AS_STRING_IF_MATCH(CONSTANT_FLOAT)
 		RETURN_AS_STRING_IF_MATCH(CONSTANT_DOUBLE)
+		/*preprocessor*/
 		RETURN_AS_STRING_IF_MATCH(PP_NUMBER)
+		RETURN_AS_STRING_IF_MATCH(PP_PARAM)
 		// end of file
 		RETURN_AS_STRING_IF_MATCH(TOKEN_EOF)
 		RETURN_AS_STRING_IF_MATCH(TOKEN_UNKNOWN)
@@ -129,6 +131,10 @@ void printToken(struct LexerState* state, struct LexerToken* token)
 		printf("line:%d, column: %d, type: IDENTIFIER, id:%d, name: \"%s\"\n",
 		       token->line + 1, token->column + 1, index,
 		       getStringAt(&state->identifiers, index));
+	} else if (token->type == PP_PARAM) {
+		int index = token->value.param_index;
+		printf("line:%d, column: %d, type: PP_PARAM, param:%d\n",
+		       token->line + 1, token->column + 1, index);
 	} else if (token->type == LITERAL_STRING) {
 		int index = token->value.string_index;
 		printf(

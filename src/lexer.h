@@ -17,6 +17,7 @@
 #define LEXER_MAX_IDENTIFIER_COUNT 1024
 #define LEXER_MAX_STRING_LITERAL_COUNT 1024
 #define LEXER_MAX_PP_NUMBER_COUNT 1024
+#define LEXER_MAX_PP_CONSTANT_COUNT 1024
 
 #define LEXER_MAX_DEFINITION_COUNT 1024
 #define LEXER_MAX_DEFINITION_TOKEN_COUNT (4096 << 2)
@@ -140,6 +141,7 @@ enum TokenType {
 	CONSTANT_DOUBLE,
 	// Preprocessor
 	PP_NUMBER,
+	PP_PARAM,
 	// other
 	TOKEN_EOF,
 	TOKEN_UNKNOWN,
@@ -147,12 +149,13 @@ enum TokenType {
 
 struct LexerConstant {
 	union {
+		uint8_t param_index;
 		uint16_t string_index;
 		int character_literal;
 		uint64_t int_literal;
 		float float_literal;
 		double double_literal;
-	} value;
+	};
 };
 
 struct LexerConstantSet {
@@ -162,17 +165,12 @@ struct LexerConstantSet {
 };
 
 struct LexerToken {
-	union {
-		uint16_t string_index;
-		int character_literal;
-		uint64_t int_literal;
-		float float_literal;
-		double double_literal;
-	} value;
+	struct LexerConstant value;
 	uint16_t line;
 	uint16_t column;
 	uint16_t line_pos;
 	uint8_t type;
+	bool literal;
 };
 
 struct LexerSourcePos {
@@ -205,5 +203,8 @@ int initLexer(struct LexerState* state, const char* file_path);
 bool getNextToken(struct LexerState* state, struct LexerToken* token);
 
 void printToken(struct LexerState* state, struct LexerToken* token);
+
+struct LexerToken createLexerTokenFromPPToken(struct LexerState* state,
+                                              struct PreprocessorToken* token);
 
 #endif

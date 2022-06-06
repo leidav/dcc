@@ -7,6 +7,7 @@ struct LexerToken;
 
 void lexerError(struct LexerState* state, const char* reason);
 void generalError(const char* reason);
+void generalWarning(const char* reason);
 
 static inline void unexpectedCharacterError(struct LexerState* state)
 {

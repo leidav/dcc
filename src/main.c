@@ -44,13 +44,27 @@ int main(int argc, const char** argv)
 		validInput = getNextToken(&lexer_state, &token);
 		if (!validInput) {
 			lexerError(&lexer_state,
-			           "An unexpected error happened during lexing");
+			           "An unexpected error occured during lexing");
 		} else {
 			printToken(&lexer_state, &token);
 		}
 
 		if (token.type == TOKEN_EOF) {
 			break;
+		}
+	}
+	for (int i = 0; i < lexer_state.pp_definitions.pp_definition_names.num;
+	     i++) {
+		printf("begin %s\n",
+		       getStringAt(&lexer_state.pp_definitions.pp_definition_names, i));
+		int start = lexer_state.pp_definitions.definitions[i].token_start;
+		int end = lexer_state.pp_definitions.definitions[i].num_tokens + start;
+		for (int j = start; j < end; j++) {
+			struct PreprocessorToken* pp_token =
+			    &lexer_state.pp_tokens.tokens[j];
+			struct LexerToken t =
+			    createLexerTokenFromPPToken(&lexer_state, pp_token);
+			printToken(&lexer_state, &t);
 		}
 	}
 	return 0;
