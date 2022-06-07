@@ -63,7 +63,7 @@ struct LexerToken createLexerTokenFromPPToken(
 	token.line = pp_token->line;
 	token.column = pp_token->column;
 	token.line_pos = pp_token->line_pos;
-	if (pp_token->type == LITERAL_STRING) {
+	if (pp_token->type == LITERAL_STRING || pp_token->type == PP_NUMBER) {
 		token.value.string_index = pp_token->value_handle;
 	} else if (pp_token->type >= CONSTANT_CHAR &&
 	           pp_token->type <= CONSTANT_DOUBLE) {
@@ -1513,7 +1513,7 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			break;
 		case '.':
 			if (isDecimalDigit(state->lookahead)) {
-				if (!lexPPNumber(state, token, ctx, true)) {
+				if (!lexPPNumber(state, token, ctx, !state->macro_body)) {
 					goto out;
 				}
 			} else {
@@ -1529,7 +1529,7 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 				}
 			} else if (isDecimalDigit(state->c)) {
 				// number
-				if (!lexPPNumber(state, token, ctx, true)) {
+				if (!lexPPNumber(state, token, ctx, !state->macro_body)) {
 					goto out;
 				}
 			} else {

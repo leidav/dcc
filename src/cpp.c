@@ -45,7 +45,7 @@ int addPreprocessorToken(struct LexerState* state,
 	pp_token->line_pos = token->line_pos;
 	pp_token->type = token->type;
 	if (token->literal) {
-		if (token->type == LITERAL_STRING) {
+		if (token->type == LITERAL_STRING || token->type == PP_NUMBER) {
 			pp_token->value_handle = token->value.string_index;
 		} else {
 			int index = state->constants.num;
