@@ -142,6 +142,8 @@ enum TokenType {
 	// Preprocessor
 	PP_NUMBER,
 	PP_PARAM,
+	PP_CONCAT,
+	PP_STRINGIFY,
 	// other
 	TOKEN_EOF,
 	TOKEN_UNKNOWN,

@@ -1558,10 +1558,14 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 		struct LexerToken token;
 		struct FileContext macro_context;
 		getFileContext(state, &macro_context);
-		//  skip preprocessor lines
 		if (state->c == '#') {
-			// stringify or concatenation operator
 			NEXT(state, out);
+			if (state->c == '#') {
+				createSimpleToken(&token, &macro_context, PP_CONCAT);
+				NEXT(state, out);
+			} else {
+				createSimpleToken(&token, &macro_context, PP_STRINGIFY);
+			}
 		} else if (function_like && isAlphabetic(state->c)) {
 			size_t marker = markAllocatorState(state->scratchpad);
 			char* read_buffer =
@@ -1582,18 +1586,15 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 				createKeywordOrIdentifierToken(state, &token, &macro_context,
 				                               read_buffer, length);
 			}
-			//    store token
-			addPreprocessorToken(state, &token);
-			num++;
 			resetAllocatorState(state->scratchpad, marker);
 		} else {
 			if (!lexTokens(state, &token, &macro_context)) {
 				goto out;
 			}
-			//  store token
-			addPreprocessorToken(state, &token);
-			num++;
 		}
+		//  store token
+		addPreprocessorToken(state, &token);
+		num++;
 		skipWhiteSpaceOrComments(state);
 	}
 	consumeInput(state);
