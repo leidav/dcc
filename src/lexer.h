@@ -147,6 +147,7 @@ enum TokenType {
 	// other
 	TOKEN_EOF,
 	TOKEN_UNKNOWN,
+	TOKEN_EMPTY,
 };
 
 struct LexerConstant {

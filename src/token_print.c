@@ -120,6 +120,7 @@ static const char* getTokenName(enum TokenType type)
 		// end of file
 		RETURN_AS_STRING_IF_MATCH(TOKEN_EOF)
 		RETURN_AS_STRING_IF_MATCH(TOKEN_UNKNOWN)
+		RETURN_AS_STRING_IF_MATCH(TOKEN_EMPTY)
 		default:
 			return "UNKNOWN";
 			break;

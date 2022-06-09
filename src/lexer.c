@@ -928,9 +928,13 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 		definition = findDefinition(state, read_buffer, length, hash);
 	}
 	if (definition != NULL) {
-		beginExpansion(state, definition);
-		struct PreprocessorToken* pp_token = getExpandedToken(state);
-		*token = createLexerTokenFromPPToken(state, pp_token);
+		if (definition->num_tokens == 0) {
+			createSimpleToken(token, ctx, TOKEN_EMPTY);
+		} else {
+			beginExpansion(state, definition);
+			struct PreprocessorToken* pp_token = getExpandedToken(state);
+			*token = createLexerTokenFromPPToken(state, pp_token);
+		}
 		status = true;
 	} else {
 		status = createKeywordOrIdentifierToken(state, token, ctx, read_buffer,
@@ -1611,9 +1615,9 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 		num++;
 		skipWhiteSpaceOrComments(state);
 	}
-	consumeInput(state);
 	createPreprocessorDefinition(state, start_index, num, params->num,
 	                             macro_name, macro_name_length, function_like);
+	consumeInput(state);
 	status = true;
 out:
 	state->macro_body = false;
@@ -1815,16 +1819,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 	}
 
 	bool status = false;
-	bool again = true;
-	while (again) {
-		again = false;
+	do {
 		struct FileContext ctx;
 		skipWhiteSpaceOrComments(state);
 		getFileContext(state, &ctx);
 		if (state->c == INPUT_EOF) {
 			getFileContext(state, &ctx);
 			createSimpleToken(token, &ctx, TOKEN_EOF);
-			break;
 		} else if (state->c == '#') {
 			// preprocessor
 			if (!state->line_beginning) {
@@ -1838,14 +1839,13 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			NEXT(state, out);
 			if (!handlePreprocessorDirective(state, &ctx)) {
 				status = false;
-				break;
 			}
-			again = true;
+			createSimpleToken(token, &ctx, TOKEN_EMPTY);
 		} else {
 			state->line_beginning = false;
 			status = lexTokens(state, token, &ctx);
 		}
-	}
+	} while (token->type == TOKEN_EMPTY);
 	status = true;
 out:
 	return status;
