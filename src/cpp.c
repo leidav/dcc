@@ -93,3 +93,54 @@ int createPreprocessorDefinition(struct LexerState* state, int token_start,
 	}
 	return index;
 }
+
+struct PreprocessorDefinition* findDefinition(struct LexerState* state,
+                                              const char* name, int length,
+                                              uint32_t hash)
+{
+	int index = findIndex(&state->pp_definitions.pp_definition_names, name,
+	                      length, hash);
+	if (index < 0) {
+		return NULL;
+	}
+	return &state->pp_definitions.definitions[index];
+}
+
+static void initTokenIterator(struct TokenIterator* it,
+                              const struct PreprocessorDefinition* definition)
+{
+	it->cur = definition->token_start;
+	it->end = definition->token_start + definition->num_tokens - 1;
+}
+
+static struct PreprocessorToken* getTokenAt(struct LexerState* state, int index)
+{
+	return &state->pp_tokens.tokens[index];
+}
+
+void beginExpansion(struct LexerState* state,
+                    struct PreprocessorDefinition* definition)
+{
+	state->expand_macro = true;
+	state->pp_expansion_stack.pos = 0;
+	initTokenIterator(&state->pp_expansion_stack.stack[0], definition);
+}
+
+struct PreprocessorToken* getExpandedToken(struct LexerState* state)
+{
+	int p = state->pp_expansion_stack.pos;
+	struct TokenIterator* it = &state->pp_expansion_stack.stack[p];
+	struct PreprocessorToken* token = NULL;
+	if (it->cur <= it->end) {
+		token = getTokenAt(state, it->cur);
+		it->cur++;
+	}
+
+	return token;
+}
+
+void stopExpansion(struct LexerState* state)
+{
+	state->pp_expansion_stack.pos = -1;
+	state->expand_macro = false;
+}

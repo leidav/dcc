@@ -533,6 +533,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	consumeInput(state);
 	state->carriage_return = false;
 	state->macro_body = false;
+	state->expand_macro = false;
 	state->error_handled = false;
 	return 0;
 }
@@ -893,9 +894,9 @@ static int readWord(struct LexerState* state, const struct FileContext* ctx,
 static bool createKeywordOrIdentifierToken(struct LexerState* state,
                                            struct LexerToken* token,
                                            const struct FileContext* ctx,
-                                           const char* string, int length)
+                                           const char* string, int length,
+                                           uint32_t hash)
 {
-	uint32_t hash = hashString(string);
 	if (!matchKeyword(string, hash, ctx, token)) {
 		int index =
 		    addStringAndHash(&state->identifiers, string, length, hash, NULL);
@@ -920,8 +921,21 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	if (length < 0) {
 		goto out;
 	}
-	status =
-	    createKeywordOrIdentifierToken(state, token, ctx, read_buffer, length);
+
+	uint32_t hash = hashString(read_buffer);
+	struct PreprocessorDefinition* definition = NULL;
+	if (!state->macro_body) {
+		definition = findDefinition(state, read_buffer, length, hash);
+	}
+	if (definition != NULL) {
+		beginExpansion(state, definition);
+		struct PreprocessorToken* pp_token = getExpandedToken(state);
+		*token = createLexerTokenFromPPToken(state, pp_token);
+		status = true;
+	} else {
+		status = createKeywordOrIdentifierToken(state, token, ctx, read_buffer,
+		                                        length, hash);
+	}
 out:
 	resetAllocatorState(state->scratchpad, marker);
 	return status;
@@ -1584,7 +1598,7 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 				createPPParamRefToken(&token, &macro_context, index);
 			} else {
 				createKeywordOrIdentifierToken(state, &token, &macro_context,
-				                               read_buffer, length);
+				                               read_buffer, length, hash);
 			}
 			resetAllocatorState(state->scratchpad, marker);
 		} else {
@@ -1792,6 +1806,14 @@ out:
 }
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
+	if (state->expand_macro) {
+		struct PreprocessorToken* pp_token = getExpandedToken(state);
+		if (pp_token) {
+			*token = createLexerTokenFromPPToken(state, pp_token);
+			return true;
+		}
+	}
+
 	bool status = false;
 	bool again = true;
 	while (again) {

@@ -5,6 +5,8 @@
 
 #include "string_set.h"
 
+#define PREPROCESSOR_MAX_EXPANSION_DEPTH 1024
+
 enum PPDefinitionFlags { FUNCTION_LIKE = 0x1 };
 
 struct LexerState;
@@ -36,6 +38,16 @@ struct PreprocessorDefinitionSet {
 	struct StringSet pp_definition_names;
 };
 
+struct TokenIterator {
+	uint16_t cur;
+	uint16_t end;
+};
+
+struct PreprocessorExpansionStack {
+	struct TokenIterator stack[PREPROCESSOR_MAX_EXPANSION_DEPTH];
+	int pos;
+};
+
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
                                size_t max_tokens);
 int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
@@ -49,5 +61,16 @@ int createPreprocessorDefinition(struct LexerState* state, int token_start,
                                  int num_tokens, int num_params,
                                  const char* name, int name_length,
                                  bool function_like);
+
+struct PreprocessorDefinition* findDefinition(struct LexerState* state,
+                                              const char* name, int length,
+                                              uint32_t hash);
+
+void beginExpansion(struct LexerState* state,
+                    struct PreprocessorDefinition* definition);
+
+struct PreprocessorToken* getExpandedToken(struct LexerState* state);
+
+void stopExpansion(struct LexerState* state);
 
 #endif

@@ -187,6 +187,7 @@ struct LexerState {
 	bool carriage_return;
 	bool line_beginning;
 	bool macro_body;
+	bool expand_macro;
 	bool error_handled;
 	char c;
 	char lookahead;
@@ -196,6 +197,7 @@ struct LexerState {
 	struct StringSet pp_numbers;
 	struct PreprocessorTokenSet pp_tokens;
 	struct PreprocessorDefinitionSet pp_definitions;
+	struct PreprocessorExpansionStack pp_expansion_stack;
 	struct LexerConstantSet constants;
 	struct LinearAllocator* scratchpad;
 };
