@@ -209,7 +209,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token);
 
 void printToken(struct LexerState* state, struct LexerToken* token);
 
-struct LexerToken createLexerTokenFromPPToken(struct LexerState* state,
-                                              struct PreprocessorToken* token);
-
+bool createLexerTokenFromPPToken(struct LexerState* state,
+                                 struct PreprocessorToken* pp_token,
+                                 struct LexerToken* token);
 #endif

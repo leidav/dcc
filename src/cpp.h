@@ -48,6 +48,11 @@ struct PreprocessorExpansionStack {
 	int pos;
 };
 
+static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
+{
+	return definition->flags & FUNCTION_LIKE;
+}
+
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
                                size_t max_tokens);
 int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,

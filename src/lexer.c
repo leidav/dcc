@@ -29,6 +29,9 @@ struct StringIterator {
 	const char* cur;
 };
 
+static bool parseNumber(struct StringIterator* it, struct LexerToken* token,
+                        const struct FileContext* ctx);
+
 static void initStringIterator(struct StringIterator* it, const char* string)
 {
 	it->start = string;
@@ -55,23 +58,36 @@ static void setFileContext(struct LexerState* state,
 	state->current_pos.column = ctx->column;
 	state->current_pos.line_pos = ctx->line_pos;
 }
-struct LexerToken createLexerTokenFromPPToken(
-    struct LexerState* state, struct PreprocessorToken* pp_token)
+bool createLexerTokenFromPPToken(struct LexerState* state,
+                                 struct PreprocessorToken* pp_token,
+                                 struct LexerToken* token)
 {
-	struct LexerToken token;
-	token.type = pp_token->type;
-	token.line = pp_token->line;
-	token.column = pp_token->column;
-	token.line_pos = pp_token->line_pos;
-	if (pp_token->type == LITERAL_STRING || pp_token->type == PP_NUMBER) {
-		token.value.string_index = pp_token->value_handle;
+	token->type = pp_token->type;
+	token->line = pp_token->line;
+	token->column = pp_token->column;
+	token->line_pos = pp_token->line_pos;
+	if (pp_token->type == LITERAL_STRING) {
+		token->value.string_index = pp_token->value_handle;
 	} else if (pp_token->type >= CONSTANT_CHAR &&
 	           pp_token->type <= CONSTANT_DOUBLE) {
-		token.value = state->constants.constants[pp_token->value_handle];
+		token->value = state->constants.constants[pp_token->value_handle];
 	} else if (pp_token->type == PP_PARAM) {
-		token.value.param_index = pp_token->value_handle;
+		token->value.param_index = pp_token->value_handle;
+	} else if (pp_token->type == PP_NUMBER) {
+		struct StringIterator it;
+		struct FileContext ctx;
+		ctx.line = pp_token->line;
+		ctx.column = pp_token->column;
+		ctx.line_pos = pp_token->line_pos;
+		const char* pp_number =
+		    getStringAt(&state->pp_numbers, pp_token->value_handle);
+		initStringIterator(&it, pp_number);
+		if (!parseNumber(&it, token, &ctx)) {
+			lexerError(state, "Invalid number");
+			return false;
+		}
 	}
-	return token;
+	return true;
 }
 
 static int createPPParamRefToken(struct LexerToken* token,
@@ -927,13 +943,15 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	if (!state->macro_body) {
 		definition = findDefinition(state, read_buffer, length, hash);
 	}
-	if (definition != NULL) {
+	if (definition != NULL && !isFunctionLike(definition)) {
 		if (definition->num_tokens == 0) {
 			createSimpleToken(token, ctx, TOKEN_EMPTY);
 		} else {
 			beginExpansion(state, definition);
 			struct PreprocessorToken* pp_token = getExpandedToken(state);
-			*token = createLexerTokenFromPPToken(state, pp_token);
+			if (!createLexerTokenFromPPToken(state, pp_token, token)) {
+				goto out;
+			}
 		}
 		status = true;
 	} else {
@@ -1812,8 +1830,7 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
 	if (state->expand_macro) {
 		struct PreprocessorToken* pp_token = getExpandedToken(state);
-		if (pp_token) {
-			*token = createLexerTokenFromPPToken(state, pp_token);
+		if (pp_token && createLexerTokenFromPPToken(state, pp_token, token)) {
 			return true;
 		}
 	}

@@ -62,8 +62,8 @@ int main(int argc, const char** argv)
 		for (int j = start; j < end; j++) {
 			struct PreprocessorToken* pp_token =
 			    &lexer_state.pp_tokens.tokens[j];
-			struct LexerToken t =
-			    createLexerTokenFromPPToken(&lexer_state, pp_token);
+			struct LexerToken t;
+			createLexerTokenFromPPToken(&lexer_state, pp_token, &t);
 			printToken(&lexer_state, &t);
 		}
 	}
