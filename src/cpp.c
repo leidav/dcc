@@ -8,10 +8,10 @@
 #include "string_set.h"
 
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
-                               size_t max_tokens)
+                               size_t max_tokens, struct Allocator* allocator)
 {
 	struct PreprocessorToken* tokens =
-	    malloc(sizeof(*set->tokens) * max_tokens);
+	    ALLOCATE_TYPE(allocator, max_tokens, typeof(*set->tokens));
 	if (tokens == NULL) {
 		return -1;
 	}
@@ -28,14 +28,15 @@ void createPreprocessorTokenSetFromBuffer(struct PreprocessorTokenSet* set,
 }
 int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
                                     size_t max_definitions,
-                                    int pp_definition_stringset_size)
+                                    int pp_definition_stringset_size,
+                                    struct Allocator* allocator)
 {
 	set->definitions = malloc(sizeof(*set->definitions) * max_definitions);
 	if (set->definitions == NULL) {
 		return -1;
 	}
 	if (createStringSet(&set->pp_definition_names, pp_definition_stringset_size,
-	                    max_definitions) != 0) {
+	                    max_definitions, allocator) != 0) {
 		free(set->definitions);
 		return -1;
 	}
@@ -136,8 +137,9 @@ void beginExpansion(struct LexerState* state,
 	state->pp_expansion_state.begin_expansion = true;
 	state->pp_expansion_state.memory_marker =
 	    markAllocatorState(state->scratchpad);
-	state->pp_expansion_state.current_state = ALLOCATE_TYPE(
-	    state->scratchpad, 1, typeof(*state->pp_expansion_state.current_state));
+	state->pp_expansion_state.current_state =
+	    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad), 1,
+	                  typeof(*state->pp_expansion_state.current_state));
 	state->pp_expansion_state.current_state->prev = NULL;
 	initTokenIterator(&state->pp_expansion_state.current_state->iterator,
 	                  definition);

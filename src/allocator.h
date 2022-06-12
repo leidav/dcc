@@ -5,45 +5,48 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define ALLOCATE_TYPE(allocator, num_elements, type)                 \
-	((type*)allocate_aligned(allocator, sizeof(type) * num_elements, \
-	                         alignof(type)))
+#define DEFAULT_ALIGNMENT 8
 
-/*struct Allocator {
-    void* (*allocate)(void* state, size_t size);
-    void (*deallocate)(void* state, void* ptr);
-};*/
+#define ALLOCATOR_CAST(allocator) ((struct Allocator*)(allocator))
+
+#define ALLOCATE_TYPE(allocator, num_elements, type)                \
+	((type*)allocateAligned(allocator, sizeof(type) * num_elements, \
+	                        alignof(type)))
+
+struct Allocator {
+	void* (*allocate)(void* allocator, size_t size,
+	                  size_t power_of_two_alignment);
+	void (*deallocate)(void* allocator, void* ptr);
+};
 
 struct LinearAllocator {
+	struct Allocator base;
+	struct Allocator* parent_allocator;
 	void* start;
 	void* free;
 	void* end;
 	bool memory_owned;
 };
 
-/*static inline void* allocate(struct Allocator* allocator, size_t size)
-{
-    return allocator->allocate(allocator->state, size);
-}
-static inline void deallocate(struct Allocator* allocator, void* ptr)
-{
-    allocator->deallocate(allocator->state, ptr);
-}*/
+void* allocateAligned(struct Allocator* allocator, size_t size,
+                      size_t power_of_two_alignment);
+void* allocate(struct Allocator* allocator, size_t size);
 
-int createAllocator(struct LinearAllocator* allocator, size_t size);
+void deallocate(struct Allocator* allocator, void* ptr);
 
-int createAllocatorFromBuffer(struct LinearAllocator* allocator, void* buffer,
-                              size_t size);
+int createLinearAllocator(struct LinearAllocator* allocator, size_t size,
+                          struct Allocator* parent_allocator);
 
-void destroyAllocator(struct LinearAllocator* allocator);
+int createLinearAllocatorFromBuffer(struct LinearAllocator* allocator,
+                                    void* buffer, size_t size);
+
+void destroyLinearAllocator(struct LinearAllocator* allocator);
 
 size_t markAllocatorState(struct LinearAllocator* allocator);
 
 void resetAllocatorState(struct LinearAllocator* allocator, size_t pos);
 
-void* allocate(struct LinearAllocator* allocator, size_t size);
-
-void* allocate_aligned(struct LinearAllocator* allocator, size_t size,
-                       size_t power_of_two_alignment);
+void* allocateLinear(struct LinearAllocator* allocator, size_t size,
+                     size_t power_of_two_alignment);
 
 #endif

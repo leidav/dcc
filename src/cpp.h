@@ -63,11 +63,14 @@ static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
 
 void createPreprocessorTokenSetFromBuffer(struct PreprocessorTokenSet* set,
                                           size_t max_tokens, void* buffer);
+
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
-                               size_t max_tokens);
+                               size_t max_tokens, struct Allocator* allocator);
+
 int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
                                     size_t max_definition,
-                                    int pp_definition_stringset_size);
+                                    int pp_definition_stringset_size,
+                                    struct Allocator* allocator);
 
 int addPreprocessorToken(struct LexerState* state,
                          struct PreprocessorTokenSet* tokens,

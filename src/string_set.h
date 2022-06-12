@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "allocator.h"
+
 struct StringSetString {
 	uint16_t offset;
 	uint16_t length;
@@ -11,11 +12,11 @@ struct StringSetString {
 
 struct StringSet {
 	struct LinearAllocator string_allocator;
+	struct Allocator* parent_allocator;
 	struct StringSetString* strings;
 	uint32_t* hashes;
 	int num;
 	int max_num;
-	bool memory_owned;
 };
 
 uint32_t hashString(const char* string);
@@ -23,7 +24,7 @@ uint32_t hashString(const char* string);
 uint32_t hashSubstring(const char* string, int length);
 
 int createStringSet(struct StringSet* stringset, size_t string_buffer_size,
-                    int max_strings);
+                    int max_strings, struct Allocator* allocator);
 
 int createStringSetInBuffer(struct StringSet* stringset,
                             size_t string_buffer_size, int max_strings,

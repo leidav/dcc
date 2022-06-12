@@ -518,24 +518,24 @@ int initLexer(struct LexerState* state, const char* file_path)
 		return -1;
 	}
 	if (createStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
-	                    LEXER_MAX_IDENTIFIER_COUNT) != 0) {
+	                    LEXER_MAX_IDENTIFIER_COUNT, NULL) != 0) {
 		return -1;
 	}
 	if (createStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
-	                    LEXER_MAX_STRING_LITERAL_COUNT) != 0) {
+	                    LEXER_MAX_STRING_LITERAL_COUNT, NULL) != 0) {
 		return -1;
 	}
 	if (createStringSet(&state->pp_numbers, LEXER_PP_NUMBER_STRINGSET_SIZE,
-	                    LEXER_MAX_PP_NUMBER_COUNT) != 0) {
+	                    LEXER_MAX_PP_NUMBER_COUNT, NULL) != 0) {
 		return -1;
 	}
-	if (createPreprocessorTokenSet(&state->pp_tokens,
-	                               LEXER_MAX_DEFINITION_TOKEN_COUNT) != 0) {
+	if (createPreprocessorTokenSet(
+	        &state->pp_tokens, LEXER_MAX_DEFINITION_TOKEN_COUNT, NULL) != 0) {
 		return -1;
 	}
-	if (createPreprocessorDefinitionSet(&state->pp_definitions,
-	                                    LEXER_MAX_DEFINITION_COUNT,
-	                                    LEXER_PP_NUMBER_STRINGSET_SIZE) != 0) {
+	if (createPreprocessorDefinitionSet(
+	        &state->pp_definitions, LEXER_MAX_DEFINITION_COUNT,
+	        LEXER_PP_NUMBER_STRINGSET_SIZE, NULL) != 0) {
 		return -1;
 	}
 	state->constants.num = 0;
@@ -822,7 +822,8 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 {
 	int length = 0;
 	size_t marker = markAllocatorState(state->scratchpad);
-	char* read_buffer = allocate(state->scratchpad, MAX_STRING_LENGTH);
+	char* read_buffer =
+	    allocate(ALLOCATOR_CAST(state->scratchpad), MAX_STRING_LENGTH);
 	if (!read_buffer) {
 		return false;
 	}
@@ -929,7 +930,8 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 {
 	bool status = false;
 	size_t marker = markAllocatorState(state->scratchpad);
-	char* read_buffer = allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
+	char* read_buffer =
+	    allocate(ALLOCATOR_CAST(state->scratchpad), MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
 		goto out;
 	}
@@ -1251,7 +1253,8 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
 {
 	size_t marker = markAllocatorState(state->scratchpad);
 	bool status = false;
-	char* read_buffer = allocate(state->scratchpad, MAX_PP_NUMBER_LENGTH);
+	char* read_buffer =
+	    allocate(ALLOCATOR_CAST(state->scratchpad), MAX_PP_NUMBER_LENGTH);
 	if (!read_buffer) {
 		generalError("buffer allocation failed");
 		goto out;
@@ -1598,8 +1601,8 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 			}
 		} else if (function_like && isAlphabetic(state->c)) {
 			size_t marker = markAllocatorState(state->scratchpad);
-			char* read_buffer =
-			    allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
+			char* read_buffer = allocate(ALLOCATOR_CAST(state->scratchpad),
+			                             MAX_IDENTIFIER_LENGTH);
 			if (read_buffer == NULL) {
 				goto out;
 			}
@@ -1655,18 +1658,14 @@ static bool handleDefineDirective(struct LexerState* state,
 	}
 	memcpy(macro_name, read_buffer, macro_name_length + 1);
 
-	struct StringSet params;
-
 	bool exists = false;
-	size_t marker = markAllocatorState(state->scratchpad);
-	char* buffer = allocate(state->scratchpad, 1024);
-	if (buffer == NULL) {
-		return false;
-	}
-
 	bool function_like = false;
 	bool status = false;
-	if (createStringSetInBuffer(&params, 256, 64, buffer, 1024) != 0) {
+
+	struct StringSet params;
+	size_t marker = markAllocatorState(state->scratchpad);
+	if (createStringSet(&params, 256, 64, ALLOCATOR_CAST(state->scratchpad)) !=
+	    0) {
 		goto out;
 	}
 	if (state->c == '(') {
@@ -1753,7 +1752,8 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 {
 	bool status = false;
 	size_t marker = markAllocatorState(state->scratchpad);
-	char* read_buffer = allocate(state->scratchpad, MAX_IDENTIFIER_LENGTH);
+	char* read_buffer =
+	    allocate(ALLOCATOR_CAST(state->scratchpad), MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
 		generalError("Memory allocation failed");
 		goto out;

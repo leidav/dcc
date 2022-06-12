@@ -61,7 +61,8 @@ static int createString(struct StringSetString* string, const char* str,
                         int length, struct LinearAllocator* string_allocator)
 {
 	string->length = length;
-	char* ptr = allocate(string_allocator, length + 1);
+	char* ptr =
+	    allocateAligned(ALLOCATOR_CAST(string_allocator), length + 1, 1);
 	if (!ptr) {
 		return -1;
 	}
@@ -98,53 +99,24 @@ static bool compareStrings(const struct StringSetString* string,
 }
 
 int createStringSet(struct StringSet* stringset, size_t string_buffer_size,
-                    int max_strings)
+                    int max_strings, struct Allocator* allocator)
 {
-	if (createAllocator(&stringset->string_allocator, string_buffer_size) !=
-	    0) {
+	if (createLinearAllocator(&stringset->string_allocator, string_buffer_size,
+	                          allocator) != 0) {
 		return -1;
 	}
-	stringset->memory_owned = true;
-	stringset->num = 0;
-	stringset->max_num = max_strings;
-	stringset->strings = malloc(sizeof(*stringset->strings) * max_strings);
-	stringset->hashes = malloc(sizeof(*stringset->hashes) * max_strings);
-	if (!stringset->strings) {
-		return -1;
-	}
-	if (!stringset->hashes) {
-		return -1;
-	}
-	return 0;
-}
-int createStringSetInBuffer(struct StringSet* stringset,
-                            size_t string_buffer_size, int max_strings,
-                            void* buffer, size_t buffer_size)
-{
-	struct LinearAllocator allocator;
-	if (createAllocatorFromBuffer(&allocator, buffer, buffer_size) != 0) {
-		return -1;
-	}
-	char* string_buffer = allocate(&allocator, string_buffer_size);
-	if (string_buffer == 0) {
-		return -1;
-	}
-	if (createAllocatorFromBuffer(&stringset->string_allocator, string_buffer,
-	                              string_buffer_size) != 0) {
-		return -1;
-	}
-	stringset->memory_owned = false;
+	stringset->parent_allocator = allocator;
 	stringset->num = 0;
 	stringset->max_num = max_strings;
 	stringset->strings =
-	    ALLOCATE_TYPE(&allocator, max_strings, typeof(*stringset->strings));
+	    ALLOCATE_TYPE(allocator, max_strings, typeof(*stringset->strings));
 	stringset->hashes =
-	    ALLOCATE_TYPE(&allocator, max_strings, typeof(*stringset->hashes));
-
+	    ALLOCATE_TYPE(allocator, max_strings, typeof(*stringset->hashes));
 	if (!stringset->strings) {
 		return -1;
 	}
 	if (!stringset->hashes) {
+		deallocate(allocator, stringset->strings);
 		return -1;
 	}
 	return 0;
@@ -153,11 +125,9 @@ int createStringSetInBuffer(struct StringSet* stringset,
 int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
                      int max_strings)
 {
-	destroyAllocator(&stringset->string_allocator);
-	if (stringset->memory_owned) {
-		free(stringset->strings);
-		free(stringset->hashes);
-	}
+	destroyLinearAllocator(&stringset->string_allocator);
+	deallocate(stringset->parent_allocator, stringset->strings);
+	deallocate(stringset->parent_allocator, stringset->hashes);
 	stringset->strings = NULL;
 	stringset->hashes = NULL;
 	stringset->num = 0;
