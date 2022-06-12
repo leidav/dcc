@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include "allocator.h"
 #include "error.h"
 #include "lexer.h"
 #include "string_set.h"
@@ -9,13 +10,21 @@
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
                                size_t max_tokens)
 {
-	set->max_tokens = max_tokens;
-	set->num = 0;
-	set->tokens = malloc(sizeof(*set->tokens) * max_tokens);
-	if (set->tokens == NULL) {
+	struct PreprocessorToken* tokens =
+	    malloc(sizeof(*set->tokens) * max_tokens);
+	if (tokens == NULL) {
 		return -1;
 	}
+	createPreprocessorTokenSetFromBuffer(set, max_tokens, tokens);
 	return 0;
+}
+
+void createPreprocessorTokenSetFromBuffer(struct PreprocessorTokenSet* set,
+                                          size_t max_tokens, void* buffer)
+{
+	set->max_tokens = max_tokens;
+	set->num = 0;
+	set->tokens = (struct PreprocessorToken*)buffer;
 }
 int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
                                     size_t max_definitions,
@@ -33,9 +42,9 @@ int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
 	return 0;
 }
 int addPreprocessorToken(struct LexerState* state,
+                         struct PreprocessorTokenSet* tokens,
                          const struct LexerToken* token)
 {
-	struct PreprocessorTokenSet* tokens = &state->pp_tokens;
 	if (tokens->num == tokens->max_tokens) {
 		return -1;
 	}
@@ -122,14 +131,23 @@ void beginExpansion(struct LexerState* state,
                     struct PreprocessorDefinition* definition)
 {
 	state->expand_macro = true;
-	state->pp_expansion_stack.pos = 0;
-	initTokenIterator(&state->pp_expansion_stack.stack[0], definition);
+	state->pp_expansion_state.pos = 0;
+	state->pp_expansion_state.function_like = isFunctionLike(definition);
+	state->pp_expansion_state.begin_expansion = true;
+	state->pp_expansion_state.memory_marker =
+	    markAllocatorState(state->scratchpad);
+	state->pp_expansion_state.current_state = ALLOCATE_TYPE(
+	    state->scratchpad, 1, typeof(*state->pp_expansion_state.current_state));
+	state->pp_expansion_state.current_state->prev = NULL;
+	initTokenIterator(&state->pp_expansion_state.current_state->iterator,
+	                  definition);
 }
 
 struct PreprocessorToken* getExpandedToken(struct LexerState* state)
 {
-	int p = state->pp_expansion_stack.pos;
-	struct TokenIterator* it = &state->pp_expansion_stack.stack[p];
+	int p = state->pp_expansion_state.pos;
+	struct TokenIterator* it =
+	    &state->pp_expansion_state.current_state->iterator;
 	struct PreprocessorToken* token = NULL;
 	if (it->cur <= it->end) {
 		token = getTokenAt(state, it->cur);
@@ -141,6 +159,10 @@ struct PreprocessorToken* getExpandedToken(struct LexerState* state)
 
 void stopExpansion(struct LexerState* state)
 {
-	state->pp_expansion_stack.pos = -1;
+	state->pp_expansion_state.pos = -1;
+	state->pp_expansion_state.begin_expansion = false;
+	state->pp_expansion_state.function_like = false;
 	state->expand_macro = false;
+	resetAllocatorState(state->scratchpad,
+	                    state->pp_expansion_state.memory_marker);
 }

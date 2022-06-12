@@ -43,9 +43,17 @@ struct TokenIterator {
 	uint16_t end;
 };
 
-struct PreprocessorExpansionStack {
-	struct TokenIterator stack[PREPROCESSOR_MAX_EXPANSION_DEPTH];
+struct StackEntry {
+	struct TokenIterator iterator;
+	struct StackEntry* prev;
+};
+
+struct PreprocessorExpansionState {
+	struct StackEntry* current_state;
 	int pos;
+	size_t memory_marker;
+	bool function_like;
+	bool begin_expansion;
 };
 
 static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
@@ -53,6 +61,8 @@ static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
 	return definition->flags & FUNCTION_LIKE;
 }
 
+void createPreprocessorTokenSetFromBuffer(struct PreprocessorTokenSet* set,
+                                          size_t max_tokens, void* buffer);
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
                                size_t max_tokens);
 int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
@@ -60,6 +70,7 @@ int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
                                     int pp_definition_stringset_size);
 
 int addPreprocessorToken(struct LexerState* state,
+                         struct PreprocessorTokenSet* tokens,
                          const struct LexerToken* token);
 
 int createPreprocessorDefinition(struct LexerState* state, int token_start,
@@ -70,6 +81,7 @@ int createPreprocessorDefinition(struct LexerState* state, int token_start,
 struct PreprocessorDefinition* findDefinition(struct LexerState* state,
                                               const char* name, int length,
                                               uint32_t hash);
+int createPreprocessorExpansionState(struct PreprocessorExpansionState* state);
 
 void beginExpansion(struct LexerState* state,
                     struct PreprocessorDefinition* definition);

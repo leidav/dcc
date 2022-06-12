@@ -943,16 +943,9 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 	if (!state->macro_body) {
 		definition = findDefinition(state, read_buffer, length, hash);
 	}
-	if (definition != NULL && !isFunctionLike(definition)) {
-		if (definition->num_tokens == 0) {
-			createSimpleToken(token, ctx, TOKEN_EMPTY);
-		} else {
-			beginExpansion(state, definition);
-			struct PreprocessorToken* pp_token = getExpandedToken(state);
-			if (!createLexerTokenFromPPToken(state, pp_token, token)) {
-				goto out;
-			}
-		}
+	if (definition != NULL) {
+		beginExpansion(state, definition);
+		createSimpleToken(token, ctx, TOKEN_EMPTY);
 		status = true;
 	} else {
 		status = createKeywordOrIdentifierToken(state, token, ctx, read_buffer,
@@ -1509,6 +1502,7 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 		case ',':
 			NEXT(state, out);
 			createSimpleToken(token, ctx, COMMA);
+			break;
 		case '(':
 			NEXT(state, out);
 			createSimpleToken(token, ctx, PARENTHESE_LEFT);
@@ -1629,7 +1623,8 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 			}
 		}
 		//  store token
-		addPreprocessorToken(state, &token);
+		struct PreprocessorTokenSet* token_set = &state->pp_tokens;
+		addPreprocessorToken(state, token_set, &token);
 		num++;
 		skipWhiteSpaceOrComments(state);
 	}
@@ -1826,18 +1821,69 @@ out:
 	resetAllocatorState(state->scratchpad, marker);
 	return status;
 }
+
+static bool lexMacroParams(struct LexerState* state,
+                           struct PreprocessorTokenSet* token_set)
+{
+	bool status = false;
+	skipWhiteSpaceOrComments(state);
+
+	int counter = 1;
+	while (true) {
+		struct LexerToken token;
+		struct FileContext macro_context;
+		getFileContext(state, &macro_context);
+		if (!lexTokens(state, &token, &macro_context)) {
+			break;
+		}
+		switch (token.type) {
+			case PARENTHESE_LEFT:
+				counter++;
+				break;
+			case PARENTHESE_RIGHT:
+				counter--;
+				break;
+		}
+		if (counter == 0) {
+			break;
+		}
+		addPreprocessorToken(state, token_set, &token);
+		skipWhiteSpaceOrComments(state);
+	}
+	return status;
+}
+
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
-	if (state->expand_macro) {
-		struct PreprocessorToken* pp_token = getExpandedToken(state);
-		if (pp_token && createLexerTokenFromPPToken(state, pp_token, token)) {
-			return true;
-		}
-	}
-
+	struct FileContext ctx;
 	bool status = false;
 	do {
-		struct FileContext ctx;
+		if (state->expand_macro) {
+			if (state->pp_expansion_state.function_like &&
+			    state->pp_expansion_state.begin_expansion) {
+				state->pp_expansion_state.begin_expansion = false;
+				skipWhiteSpaceOrComments(state);
+				if (state->c != '(') {
+					lexerError(
+					    state,
+					    "function like macro must be called like a function");
+					goto out;
+				}
+				NEXT(state, out);
+				int saved_num = state->pp_tokens.num;
+				lexMacroParams(state, &state->pp_tokens);
+			}
+			struct PreprocessorToken* pp_token = getExpandedToken(state);
+			if (pp_token) {
+				if (createLexerTokenFromPPToken(state, pp_token, token)) {
+					status = true;
+				}
+				break;
+			} else {
+				stopExpansion(state);
+			}
+		}
+
 		skipWhiteSpaceOrComments(state);
 		getFileContext(state, &ctx);
 		if (state->c == INPUT_EOF) {

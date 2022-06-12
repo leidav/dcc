@@ -198,7 +198,7 @@ struct LexerState {
 	struct StringSet pp_numbers;
 	struct PreprocessorTokenSet pp_tokens;
 	struct PreprocessorDefinitionSet pp_definitions;
-	struct PreprocessorExpansionStack pp_expansion_stack;
+	struct PreprocessorExpansionState pp_expansion_state;
 	struct LexerConstantSet constants;
 	struct LinearAllocator* scratchpad;
 };

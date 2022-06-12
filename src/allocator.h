@@ -9,12 +9,26 @@
 	((type*)allocate_aligned(allocator, sizeof(type) * num_elements, \
 	                         alignof(type)))
 
+/*struct Allocator {
+    void* (*allocate)(void* state, size_t size);
+    void (*deallocate)(void* state, void* ptr);
+};*/
+
 struct LinearAllocator {
 	void* start;
 	void* free;
 	void* end;
 	bool memory_owned;
 };
+
+/*static inline void* allocate(struct Allocator* allocator, size_t size)
+{
+    return allocator->allocate(allocator->state, size);
+}
+static inline void deallocate(struct Allocator* allocator, void* ptr)
+{
+    allocator->deallocate(allocator->state, ptr);
+}*/
 
 int createAllocator(struct LinearAllocator* allocator, size_t size);
 

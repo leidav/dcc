@@ -137,9 +137,10 @@ int createStringSetInBuffer(struct StringSet* stringset,
 	stringset->num = 0;
 	stringset->max_num = max_strings;
 	stringset->strings =
-	    allocate(&allocator, sizeof(*stringset->strings) * max_strings);
+	    ALLOCATE_TYPE(&allocator, max_strings, typeof(*stringset->strings));
 	stringset->hashes =
-	    allocate(&allocator, sizeof(*stringset->hashes) * max_strings);
+	    ALLOCATE_TYPE(&allocator, max_strings, typeof(*stringset->hashes));
+
 	if (!stringset->strings) {
 		return -1;
 	}
