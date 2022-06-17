@@ -39,12 +39,14 @@ struct PreprocessorDefinitionSet {
 };
 
 struct TokenIterator {
-	uint16_t cur;
-	uint16_t end;
+	int16_t cur;
+	int16_t end;
 };
 
 struct StackEntry {
 	struct TokenIterator iterator;
+	struct TokenIterator* param_iterators;
+	uint8_t num_params;
 	struct StackEntry* prev;
 };
 
@@ -52,6 +54,7 @@ struct PreprocessorExpansionState {
 	struct StackEntry* current_state;
 	int pos;
 	size_t memory_marker;
+	uint16_t token_marker;
 	bool function_like;
 	bool begin_expansion;
 };

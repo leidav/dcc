@@ -1823,33 +1823,66 @@ out:
 }
 
 static bool lexMacroParams(struct LexerState* state,
-                           struct PreprocessorTokenSet* token_set)
+                           struct PreprocessorTokenSet* token_set,
+                           int token_offset, struct TokenIterator* params,
+                           int expected_param_count)
 {
 	bool status = false;
 	skipWhiteSpaceOrComments(state);
 
+	int param_index = 0;
 	int counter = 1;
+	int16_t token_count = 0;
+	int16_t token_start = 0;
 	while (true) {
 		struct LexerToken token;
 		struct FileContext macro_context;
 		getFileContext(state, &macro_context);
 		if (!lexTokens(state, &token, &macro_context)) {
-			break;
+			goto out;
 		}
+		if (token.type == TOKEN_EOF) {
+			lexerError(state, "macro parantheses not closed");
+			goto out;
+		}
+
 		switch (token.type) {
+			break;
 			case PARENTHESE_LEFT:
 				counter++;
 				break;
 			case PARENTHESE_RIGHT:
 				counter--;
 				break;
+			case COMMA:
+				if (counter == 1) {
+					if (param_index == expected_param_count - 1) {
+						lexerError(state, "to many macro parameters");
+						goto out;
+					}
+					params[param_index].cur = token_start + token_offset;
+					params[param_index].end = token_count - 1 + token_offset;
+					token_start = token_count + 1;
+					params[param_index + 1].cur = token_start + token_offset;
+					param_index++;
+				}
+				break;
 		}
 		if (counter == 0) {
+			params[param_index].end = token_count - 1 + token_offset;
 			break;
+		} else {
+			addPreprocessorToken(state, token_set, &token);
 		}
-		addPreprocessorToken(state, token_set, &token);
 		skipWhiteSpaceOrComments(state);
+		token_count++;
 	}
+	if (param_index < expected_param_count - 1) {
+		lexerError(state, "more macro parameters expected");
+		goto out;
+	}
+	status = true;
+out:
 	return status;
 }
 
@@ -1867,11 +1900,23 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					lexerError(
 					    state,
 					    "function like macro must be called like a function");
+					stopExpansion(state);
 					goto out;
 				}
 				NEXT(state, out);
-				int saved_num = state->pp_tokens.num;
-				lexMacroParams(state, &state->pp_tokens);
+				int param_count =
+				    state->pp_expansion_state.current_state->num_params;
+				state->pp_expansion_state.current_state->param_iterators =
+				    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad),
+				                  param_count,
+				                  typeof(*state->pp_expansion_state
+				                              .current_state->param_iterators));
+
+				lexMacroParams(
+				    state, &state->pp_tokens,
+				    state->pp_expansion_state.token_marker,
+				    state->pp_expansion_state.current_state->param_iterators,
+				    param_count);
 			}
 			struct PreprocessorToken* pp_token = getExpandedToken(state);
 			if (pp_token) {

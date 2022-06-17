@@ -137,26 +137,72 @@ void beginExpansion(struct LexerState* state,
 	state->pp_expansion_state.begin_expansion = true;
 	state->pp_expansion_state.memory_marker =
 	    markAllocatorState(state->scratchpad);
+	state->pp_expansion_state.token_marker = state->pp_tokens.num;
 	state->pp_expansion_state.current_state =
 	    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad), 1,
 	                  typeof(*state->pp_expansion_state.current_state));
 	state->pp_expansion_state.current_state->prev = NULL;
+	state->pp_expansion_state.current_state->num_params =
+	    definition->num_params;
+	state->pp_expansion_state.current_state->param_iterators = NULL;
 	initTokenIterator(&state->pp_expansion_state.current_state->iterator,
 	                  definition);
 }
 
+static int pushStack(struct LexerState* state, struct TokenIterator* it,
+                     struct TokenIterator* param_iterators, int num_params)
+{
+	struct StackEntry* entry =
+	    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad), 1,
+	                  typeof(*state->pp_expansion_state.current_state));
+	if (entry == NULL) {
+		return -1;
+	}
+	entry->prev = state->pp_expansion_state.current_state;
+	entry->iterator = *it;
+	entry->param_iterators = param_iterators;
+	entry->num_params = num_params;
+	state->pp_expansion_state.current_state = entry;
+	return 0;
+}
+static void popStack(struct LexerState* state)
+{
+	struct StackEntry* entry = state->pp_expansion_state.current_state;
+	if (entry->prev != NULL) {
+		state->pp_expansion_state.current_state = entry->prev;
+	}
+}
+
+struct PreprocessorToken* expand(struct LexerState* state)
+{
+	struct StackEntry* current_state = state->pp_expansion_state.current_state;
+	struct TokenIterator* it = &current_state->iterator;
+	struct PreprocessorToken* token = NULL;
+	if (current_state->prev == NULL && it->cur > it->end) {
+		return NULL;
+	} else if (it->cur <= it->end) {
+		token = getTokenAt(state, it->cur);
+		if (token->type == PP_PARAM) {
+			struct TokenIterator* param_iterators =
+			    current_state->param_iterators;
+			int num_params = current_state->num_params;
+			struct TokenIterator* p = &param_iterators[token->value_handle];
+			if (pushStack(state, p, NULL, 0) != 0) {
+				return NULL;
+			}
+			token = expand(state);
+		}
+		it->cur++;
+	} else {
+		popStack(state);
+		token = expand(state);
+	}
+	return token;
+}
+
 struct PreprocessorToken* getExpandedToken(struct LexerState* state)
 {
-	int p = state->pp_expansion_state.pos;
-	struct TokenIterator* it =
-	    &state->pp_expansion_state.current_state->iterator;
-	struct PreprocessorToken* token = NULL;
-	if (it->cur <= it->end) {
-		token = getTokenAt(state, it->cur);
-		it->cur++;
-	}
-
-	return token;
+	return expand(state);
 }
 
 void stopExpansion(struct LexerState* state)
@@ -167,4 +213,5 @@ void stopExpansion(struct LexerState* state)
 	state->expand_macro = false;
 	resetAllocatorState(state->scratchpad,
 	                    state->pp_expansion_state.memory_marker);
+	state->pp_tokens.num = state->pp_expansion_state.token_marker;
 }
