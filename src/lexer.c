@@ -1892,11 +1892,12 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 	struct FileContext ctx;
 	bool status = false;
 	do {
+		skipWhiteSpaceOrComments(state);
+
 		if (state->expand_macro) {
 			if (state->pp_expansion_state.function_like &&
 			    state->pp_expansion_state.begin_expansion) {
 				state->pp_expansion_state.begin_expansion = false;
-				skipWhiteSpaceOrComments(state);
 				if (state->c != '(') {
 					lexerError(
 					    state,
@@ -1931,13 +1932,12 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				if (createLexerTokenFromPPToken(state, &pp_token, token)) {
 					status = true;
 				}
-				break;
+				goto out;
 			} else {
 				stopExpansion(state);
 			}
 		}
 
-		skipWhiteSpaceOrComments(state);
 		getFileContext(state, &ctx);
 		if (state->c == INPUT_EOF) {
 			getFileContext(state, &ctx);
