@@ -1822,10 +1822,10 @@ out:
 	return status;
 }
 
-static bool lexMacroParams(struct LexerState* state,
-                           struct PreprocessorTokenSet* token_set,
-                           int token_offset, struct TokenIterator* params,
-                           int expected_param_count)
+static bool lexMacroParamTokens(struct LexerState* state,
+                                struct PreprocessorTokenSet* token_set,
+                                int token_offset, struct TokenIterator* params,
+                                int expected_param_count)
 {
 	bool status = false;
 	skipWhiteSpaceOrComments(state);
@@ -1834,6 +1834,7 @@ static bool lexMacroParams(struct LexerState* state,
 	int counter = 1;
 	int16_t token_count = 0;
 	int16_t token_start = 0;
+	params[0].cur = token_offset;
 	while (true) {
 		struct LexerToken token;
 		struct FileContext macro_context;
@@ -1914,11 +1915,11 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				                  typeof(*state->pp_expansion_state
 				                              .current_state->param_iterators));
 
-				if (!lexMacroParams(state, &state->pp_tokens,
-				                    state->pp_expansion_state.token_marker,
-				                    state->pp_expansion_state.current_state
-				                        ->param_iterators,
-				                    param_count)) {
+				if (!lexMacroParamTokens(state, &state->pp_tokens,
+				                         state->pp_expansion_state.token_marker,
+				                         state->pp_expansion_state
+				                             .current_state->param_iterators,
+				                         param_count)) {
 					stopExpansion(state);
 					goto out;
 				}
