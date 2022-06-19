@@ -22,7 +22,7 @@ void* allocate(struct Allocator* allocator, size_t size)
 {
 	void* mem = allocateAligned(allocator, size, DEFAULT_ALIGNMENT);
 	if (mem == NULL) {
-		printf("error memory allocation failed\n");
+		fprintf(stderr, "memory allocation failed\n");
 	}
 	return mem;
 }
@@ -102,7 +102,7 @@ void* allocateLinear(struct LinearAllocator* allocator, size_t size,
 {
 	size_t offset = alignmentOffset(allocator->free, power_of_two_alignment);
 	void* next_free = allocator->free + offset + size;
-	if (next_free > allocator->end) {
+	if (next_free >= allocator->end) {
 		return NULL;
 	}
 	void* address = allocator->free + offset;

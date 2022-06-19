@@ -92,7 +92,8 @@ int createPreprocessorExpansionState(struct PreprocessorExpansionState* state);
 void beginExpansion(struct LexerState* state,
                     struct PreprocessorDefinition* definition);
 
-struct PreprocessorToken* getExpandedToken(struct LexerState* state);
+bool getExpandedToken(struct LexerState* state,
+                      struct PreprocessorToken* token);
 
 void stopExpansion(struct LexerState* state);
 

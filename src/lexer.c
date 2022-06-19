@@ -1881,6 +1881,7 @@ static bool lexMacroParams(struct LexerState* state,
 		lexerError(state, "more macro parameters expected");
 		goto out;
 	}
+
 	status = true;
 out:
 	return status;
@@ -1912,15 +1913,22 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				                  typeof(*state->pp_expansion_state
 				                              .current_state->param_iterators));
 
-				lexMacroParams(
-				    state, &state->pp_tokens,
-				    state->pp_expansion_state.token_marker,
-				    state->pp_expansion_state.current_state->param_iterators,
-				    param_count);
+				if (!lexMacroParams(state, &state->pp_tokens,
+				                    state->pp_expansion_state.token_marker,
+				                    state->pp_expansion_state.current_state
+				                        ->param_iterators,
+				                    param_count)) {
+					stopExpansion(state);
+					goto out;
+				}
 			}
-			struct PreprocessorToken* pp_token = getExpandedToken(state);
-			if (pp_token) {
-				if (createLexerTokenFromPPToken(state, pp_token, token)) {
+			struct PreprocessorToken pp_token;
+			if (!getExpandedToken(state, &pp_token)) {
+				stopExpansion(state);
+				goto out;
+			}
+			if (pp_token.type != TOKEN_EOF) {
+				if (createLexerTokenFromPPToken(state, &pp_token, token)) {
 					status = true;
 				}
 				break;

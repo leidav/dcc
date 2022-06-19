@@ -107,13 +107,22 @@ void lexerError(struct LexerState* state, const char* reason)
 }
 void generalError(const char* reason)
 {
-	fprintf(stderr, "Error: %s\n", reason);
+	bool is_tty = isatty(STDERR_FILENO) != 0;
+	setBold(is_tty);
+	setRedColor(is_tty);
+	fprintf(stderr, "error: ");
+	resetColor(is_tty);
+	fprintf(stderr, "%s\n", reason);
+	resetBold(is_tty);
 }
 
 void generalWarning(const char* reason)
 {
 	bool is_tty = isatty(STDERR_FILENO) != 0;
+	setBold(is_tty);
 	setYellowColor(is_tty);
-	fprintf(stderr, "Warning: %s\n", reason);
+	fprintf(stderr, "warning: ");
 	resetColor(is_tty);
+	fprintf(stderr, "%s\n", reason);
+	resetBold(is_tty);
 }

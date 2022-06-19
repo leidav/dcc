@@ -173,36 +173,38 @@ static void popStack(struct LexerState* state)
 	}
 }
 
-struct PreprocessorToken* expand(struct LexerState* state)
+bool expand(struct LexerState* state, struct PreprocessorToken* token)
 {
 	struct StackEntry* current_state = state->pp_expansion_state.current_state;
 	struct TokenIterator* it = &current_state->iterator;
-	struct PreprocessorToken* token = NULL;
+
+	bool status = true;
 	if (current_state->prev == NULL && it->cur > it->end) {
-		return NULL;
+		token->type = TOKEN_EOF;
 	} else if (it->cur <= it->end) {
-		token = getTokenAt(state, it->cur);
+		*token = *getTokenAt(state, it->cur);
+		it->cur++;
 		if (token->type == PP_PARAM) {
 			struct TokenIterator* param_iterators =
 			    current_state->param_iterators;
 			int num_params = current_state->num_params;
 			struct TokenIterator* p = &param_iterators[token->value_handle];
 			if (pushStack(state, p, NULL, 0) != 0) {
-				return NULL;
+				generalError("expansion stack full");
+				return false;
 			}
-			token = expand(state);
+			status = expand(state, token);
 		}
-		it->cur++;
 	} else {
 		popStack(state);
-		token = expand(state);
+		status = expand(state, token);
 	}
-	return token;
+	return status;
 }
 
-struct PreprocessorToken* getExpandedToken(struct LexerState* state)
+bool getExpandedToken(struct LexerState* state, struct PreprocessorToken* token)
 {
-	return expand(state);
+	return expand(state, token);
 }
 
 void stopExpansion(struct LexerState* state)
