@@ -45,6 +45,7 @@ int main(int argc, const char** argv)
 		if (!validInput) {
 			lexerError(&lexer_state,
 			           "An unexpected error occured during lexing");
+			exit(1);
 		} else {
 			printToken(&lexer_state, &token);
 		}

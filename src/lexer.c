@@ -1947,11 +1947,15 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			NEXT(state, out);
 			if (!handlePreprocessorDirective(state, &ctx)) {
 				status = false;
+				goto out;
 			}
 			createSimpleToken(token, &ctx, TOKEN_EMPTY);
 		} else {
 			state->line_beginning = false;
-			status = lexTokens(state, token, &ctx);
+			if (!lexTokens(state, token, &ctx)) {
+				status = false;
+				goto out;
+			}
 		}
 	} while (token->type == TOKEN_EMPTY);
 	status = true;
