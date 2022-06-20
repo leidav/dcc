@@ -207,9 +207,9 @@ int initLexer(struct LexerState* state, const char* file_path);
 
 bool getNextToken(struct LexerState* state, struct LexerToken* token);
 
-void printToken(struct LexerState* state, struct LexerToken* token);
+void printToken(struct LexerState* state, const struct LexerToken* token);
 
 bool createLexerTokenFromPPToken(struct LexerState* state,
-                                 struct PreprocessorToken* pp_token,
+                                 const struct PreprocessorToken* pp_token,
                                  struct LexerToken* token);
 #endif

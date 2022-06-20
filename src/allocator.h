@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define DEFAULT_ALIGNMENT 8
+#define DEFAULT_ALIGNMENT 16
 
 #define ALLOCATOR_CAST(allocator) ((struct Allocator*)(allocator))
 

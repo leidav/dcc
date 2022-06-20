@@ -59,14 +59,14 @@ static void setFileContext(struct LexerState* state,
 	state->current_pos.line_pos = ctx->line_pos;
 }
 bool createLexerTokenFromPPToken(struct LexerState* state,
-                                 struct PreprocessorToken* pp_token,
+                                 const struct PreprocessorToken* pp_token,
                                  struct LexerToken* token)
 {
 	token->type = pp_token->type;
 	token->line = pp_token->line;
 	token->column = pp_token->column;
 	token->line_pos = pp_token->line_pos;
-	if (pp_token->type == LITERAL_STRING) {
+	if (pp_token->type == LITERAL_STRING || pp_token->type == IDENTIFIER) {
 		token->value.string_index = pp_token->value_handle;
 	} else if (pp_token->type >= CONSTANT_CHAR &&
 	           pp_token->type <= CONSTANT_DOUBLE) {
@@ -942,7 +942,7 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 
 	uint32_t hash = hashString(read_buffer);
 	struct PreprocessorDefinition* definition = NULL;
-	if (!state->macro_body) {
+	if (!state->macro_body && !state->expand_macro) {
 		definition = findDefinition(state, read_buffer, length, hash);
 	}
 	if (definition != NULL) {
@@ -1627,7 +1627,9 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 		}
 		//  store token
 		struct PreprocessorTokenSet* token_set = &state->pp_tokens;
-		addPreprocessorToken(state, token_set, &token);
+		if (addPreprocessorToken(state, token_set, &token) < 0) {
+			goto out;
+		}
 		num++;
 		skipWhiteSpaceOrComments(state);
 	}
@@ -1873,7 +1875,9 @@ static bool lexMacroParamTokens(struct LexerState* state,
 			params[param_index].end = token_count - 1 + token_offset;
 			break;
 		} else {
-			addPreprocessorToken(state, token_set, &token);
+			if (addPreprocessorToken(state, token_set, &token) < 0) {
+				goto out;
+			}
 		}
 		skipWhiteSpaceOrComments(state);
 		token_count++;

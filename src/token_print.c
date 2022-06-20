@@ -127,7 +127,7 @@ static const char* getTokenName(enum TokenType type)
 	}
 };
 
-void printToken(struct LexerState* state, struct LexerToken* token)
+void printToken(struct LexerState* state, const struct LexerToken* token)
 {
 	if (token->type == IDENTIFIER) {
 		int index = token->value.string_index;

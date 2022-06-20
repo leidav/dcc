@@ -1,6 +1,7 @@
 #include "cpp.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "allocator.h"
 #include "error.h"
@@ -47,6 +48,7 @@ int addPreprocessorToken(struct LexerState* state,
                          const struct LexerToken* token)
 {
 	if (tokens->num == tokens->max_tokens) {
+		generalError("not enough memory to store token");
 		return -1;
 	}
 	struct PreprocessorToken* pp_token = &tokens->tokens[tokens->num];
@@ -60,6 +62,7 @@ int addPreprocessorToken(struct LexerState* state,
 		} else {
 			int index = state->constants.num;
 			if (index == state->constants.max_count) {
+				generalError("not enough memory to store numeric constant");
 				return -1;
 			}
 			state->constants.constants[index] = token->value;
@@ -67,7 +70,9 @@ int addPreprocessorToken(struct LexerState* state,
 			state->constants.num++;
 		}
 	}
-	if (token->type == PP_PARAM) {
+	if (token->type == IDENTIFIER) {
+		pp_token->value_handle = token->value.string_index;
+	} else if (token->type == PP_PARAM) {
 		pp_token->value_handle = token->value.param_index;
 	}
 
@@ -182,18 +187,20 @@ bool expand(struct LexerState* state, struct PreprocessorToken* token)
 	if (current_state->prev == NULL && it->cur > it->end) {
 		token->type = TOKEN_EOF;
 	} else if (it->cur <= it->end) {
-		*token = *getTokenAt(state, it->cur);
+		struct PreprocessorToken* tok = getTokenAt(state, it->cur);
 		it->cur++;
-		if (token->type == PP_PARAM) {
+		if (tok->type == PP_PARAM) {
 			struct TokenIterator* param_iterators =
 			    current_state->param_iterators;
 			int num_params = current_state->num_params;
-			struct TokenIterator* p = &param_iterators[token->value_handle];
+			struct TokenIterator* p = &param_iterators[tok->value_handle];
 			if (pushStack(state, p, NULL, 0) != 0) {
 				generalError("expansion stack full");
 				return false;
 			}
 			status = expand(state, token);
+		} else {
+			memcpy(token, tok, sizeof(*tok));
 		}
 	} else {
 		popStack(state);
