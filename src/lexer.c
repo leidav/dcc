@@ -1912,17 +1912,17 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 				}
 				NEXT(state, out);
 				int param_count =
-				    state->pp_expansion_state.current_state->num_params;
-				state->pp_expansion_state.current_state->param_iterators =
-				    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad),
-				                  param_count,
-				                  typeof(*state->pp_expansion_state
-				                              .current_state->param_iterators));
+				    state->pp_expansion_state.current_context->num_params;
+				state->pp_expansion_state.current_context->param_iterators =
+				    ALLOCATE_TYPE(
+				        ALLOCATOR_CAST(state->scratchpad), param_count,
+				        typeof(*state->pp_expansion_state.current_context
+				                    ->param_iterators));
 
 				if (!lexMacroParamTokens(state, &state->pp_tokens,
 				                         state->pp_expansion_state.token_marker,
 				                         state->pp_expansion_state
-				                             .current_state->param_iterators,
+				                             .current_context->param_iterators,
 				                         param_count)) {
 					stopExpansion(state);
 					goto out;

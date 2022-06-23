@@ -175,6 +175,16 @@ const char* getStringAt(struct StringSet* stringset, int index)
 	return getString(&stringset->strings[index], &stringset->string_allocator);
 }
 
+uint32_t getHashAt(struct StringSet* stringset, int index)
+{
+	return stringset->hashes[index];
+}
+
+int getLengthAt(struct StringSet* stringset, int index)
+{
+	return stringset->strings[index].length;
+}
+
 int findIndex(struct StringSet* stringset, const char* string, int length,
               uint32_t hash)
 {

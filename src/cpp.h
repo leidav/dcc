@@ -43,15 +43,15 @@ struct TokenIterator {
 	int16_t end;
 };
 
-struct StackEntry {
+struct ExpansionContext {
 	struct TokenIterator iterator;
 	struct TokenIterator* param_iterators;
 	uint8_t num_params;
-	struct StackEntry* prev;
+	struct ExpansionContext* prev;
 };
 
 struct PreprocessorExpansionState {
-	struct StackEntry* current_state;
+	struct ExpansionContext* current_context;
 	int pos;
 	size_t memory_marker;
 	uint16_t token_marker;

@@ -40,6 +40,10 @@ int addString(struct StringSet* stringset, const char* string, int length);
 
 const char* getStringAt(struct StringSet* stringset, int index);
 
+int getLengthAt(struct StringSet* stringset, int index);
+
+uint32_t getHashAt(struct StringSet* stringset, int index);
+
 int findIndex(struct StringSet* stringset, const char* string, int length,
               uint32_t hash);
 
