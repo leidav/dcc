@@ -39,6 +39,7 @@ struct PreprocessorDefinitionSet {
 };
 
 struct TokenIterator {
+	uint16_t start;
 	int16_t cur;
 	int16_t end;
 };
@@ -96,5 +97,8 @@ bool getExpandedToken(struct LexerState* state,
                       struct PreprocessorToken* token);
 
 void stopExpansion(struct LexerState* state);
+
+void printPPToken(struct LexerState* state,
+                  const struct PreprocessorToken* token);
 
 #endif

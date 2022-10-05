@@ -45,6 +45,17 @@ int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
 	}
 	return 0;
 }
+int addPreprocessorPPToken(struct LexerState* state,
+                           struct PreprocessorTokenSet* tokens,
+                           const struct PreprocessorToken* token)
+{
+	if (tokens->num == tokens->max_tokens) {
+		generalError("not enough memory to store token");
+		return -1;
+	}
+	tokens->tokens[tokens->num] = *token;
+	return ++tokens->num;
+}
 int addPreprocessorToken(struct LexerState* state,
                          struct PreprocessorTokenSet* tokens,
                          const struct LexerToken* token)
@@ -126,8 +137,14 @@ struct PreprocessorDefinition* findDefinition(struct LexerState* state,
 static void initTokenIterator(struct TokenIterator* it,
                               const struct PreprocessorDefinition* definition)
 {
+	it->start = definition->token_start;
 	it->cur = definition->token_start;
 	it->end = definition->token_start + definition->num_tokens - 1;
+}
+
+static void resetTokenIterator(struct TokenIterator* it)
+{
+	it->cur = it->start;
 }
 
 static struct PreprocessorToken* getTokenAt(struct LexerState* state, int index)
@@ -182,9 +199,9 @@ static void popContext(struct LexerState* state)
 	}
 }
 
-int preExpandParams(struct LexerState* state,
-                    struct TokenIterator* param_tokens,
-                    struct PreprocessorToken* output_buffer, int max_len)
+static int expandParamsIntoBuffer(struct LexerState* state,
+                                  struct TokenIterator* param_tokens,
+                                  struct PreprocessorTokenSet* output)
 {
 	if (pushContext(state, param_tokens, NULL, 0) != 0) {
 		return -1;
@@ -197,20 +214,78 @@ int preExpandParams(struct LexerState* state,
 		struct PreprocessorToken* token = getTokenAt(state, it->cur);
 		struct PreprocessorToken expanded_token;
 		do {
-			if (i == max_len) {
-				generalError("macro parameter buffer full");
-				return -1;
-			}
 			if (!expand(state, &expanded_token)) {
 				return -1;
 			}
-			output_buffer[i] = expanded_token;
+			addPreprocessorPPToken(state, output, &expanded_token);
 			i++;
 		} while (expanded_token.type != TOKEN_EOF);
 		it->cur++;
 	}
 	popContext(state);
 	return i;
+}
+
+static bool prepareMacroParamTokens(struct LexerState* state,
+                                    struct TokenIterator* params,
+                                    int expected_param_count)
+{
+	struct ExpansionContext* current_context =
+	    state->pp_expansion_state.current_context;
+	struct TokenIterator* it = &current_context->iterator;
+
+	bool status = false;
+
+	int token_offset = it->cur;
+	int param_index = 0;
+	int counter = 1;
+	int16_t token_count = 0;
+	int16_t token_start = 0;
+	params[0].cur = token_offset;
+	while (true) {
+		if (it->cur > it->end) {
+			lexerError(state, "macro parantheses not closed");
+			goto out;
+		}
+		struct PreprocessorToken* token = getTokenAt(state, it->cur);
+
+		switch (token->type) {
+			break;
+			case PARENTHESE_LEFT:
+				counter++;
+				break;
+			case PARENTHESE_RIGHT:
+				counter--;
+				break;
+			case COMMA:
+				if (counter == 1) {
+					if (param_index == expected_param_count - 1) {
+						lexerError(state, "to many macro parameters");
+						goto out;
+					}
+					params[param_index].cur = token_start + token_offset;
+					params[param_index].end = token_count - 1 + token_offset;
+					token_start = token_count + 1;
+					params[param_index + 1].cur = token_start + token_offset;
+					param_index++;
+				}
+				break;
+		}
+		if (counter == 0) {
+			params[param_index].end = token_count - 1 + token_offset;
+			break;
+		}
+
+		token_count++;
+		it->cur++;
+	}
+	if (param_index < expected_param_count - 1) {
+		lexerError(state, "more macro parameters expected");
+		goto out;
+	}
+	status = true;
+out:
+	return status;
 }
 
 bool expand(struct LexerState* state, struct PreprocessorToken* token)
@@ -230,6 +305,11 @@ bool expand(struct LexerState* state, struct PreprocessorToken* token)
 			    current_context->param_iterators;
 			int num_params = current_context->num_params;
 			struct TokenIterator* p = &param_iterators[tok->value_handle];
+			/*int num_tokens =
+			    expandParamsIntoBuffer(state, p, &state->pp_tokens);
+			if (num_tokens == -1) {
+			    return false;
+			}*/
 			if (pushContext(state, p, NULL, 0) != 0) {
 				return false;
 			}
@@ -242,9 +322,38 @@ bool expand(struct LexerState* state, struct PreprocessorToken* token)
 			struct PreprocessorDefinition* def =
 			    findDefinition(state, identifier, length, hash);
 			if (def != NULL) {
+				struct TokenIterator* param_iterators = NULL;
+				int num_params = 0;
+				if (isFunctionLike(def)) {
+					if (++it->cur > it->end &&
+					    getTokenAt(state, it->cur)->type != PARENTHESE_LEFT) {
+						lexerError(state,
+						           "function like macro must be called like a "
+						           "function");
+					}
+					num_params = def->num_params;
+					param_iterators =
+					    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad),
+					                  num_params, struct TokenIterator);
+					if (param_iterators == NULL) {
+						return false;
+					}
+
+					prepareMacroParamTokens(state, param_iterators, num_params);
+					/*for (int j = 0; j < num_params; j++) {
+					    printf("param: %d\n", j);
+					    for (int i = param_iterators[j].cur;
+					         i <= param_iterators[j].end; i++) {
+					        struct PreprocessorToken* t = getTokenAt(state, i);
+					        printPPToken(state, t);
+					        printf("token-pos: %d\n", i);
+					    }
+					}*/
+				}
 				struct TokenIterator iter;
 				initTokenIterator(&iter, def);
-				if (pushContext(state, &iter, NULL, 0) != 0) {
+				if (pushContext(state, &iter, param_iterators, num_params) !=
+				    0) {
 					return false;
 				}
 				status = expand(state, token);
@@ -276,4 +385,12 @@ void stopExpansion(struct LexerState* state)
 	resetAllocatorState(state->scratchpad,
 	                    state->pp_expansion_state.memory_marker);
 	state->pp_tokens.num = state->pp_expansion_state.token_marker;
+}
+
+void printPPToken(struct LexerState* state,
+                  const struct PreprocessorToken* pp_token)
+{
+	struct LexerToken token;
+	createLexerTokenFromPPToken(state, pp_token, &token);
+	printToken(state, &token);
 }
