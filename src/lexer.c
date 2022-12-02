@@ -1837,6 +1837,7 @@ static bool lexMacroParamTokens(struct LexerState* state,
 	int16_t token_count = 0;
 	int16_t token_start = 0;
 	params[0].cur = token_offset;
+	params[0].start = token_offset;
 	while (true) {
 		struct LexerToken token;
 		struct FileContext macro_context;
@@ -1850,7 +1851,6 @@ static bool lexMacroParamTokens(struct LexerState* state,
 		}
 
 		switch (token.type) {
-			break;
 			case PARENTHESE_LEFT:
 				counter++;
 				break;
@@ -1864,9 +1864,11 @@ static bool lexMacroParamTokens(struct LexerState* state,
 						goto out;
 					}
 					params[param_index].cur = token_start + token_offset;
+					params[param_index].start = params[param_index].cur;
 					params[param_index].end = token_count - 1 + token_offset;
 					token_start = token_count + 1;
 					params[param_index + 1].cur = token_start + token_offset;
+					params[param_index + 1].start = params[param_index + 1].cur;
 					param_index++;
 				}
 				break;
@@ -1911,13 +1913,14 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 					goto out;
 				}
 				NEXT(state, out);
-				int param_count =
-				    state->pp_expansion_state.current_context->num_params;
+				int param_count = state->pp_expansion_state.current_context
+				                      ->param->num_params;
 				struct TokenIterator* param_iterators =
 				    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad),
 				                  param_count, typeof(*param_iterators));
-				state->pp_expansion_state.current_context->param_iterators =
+				state->pp_expansion_state.current_context->param->iterators =
 				    param_iterators;
+				state->pp_expansion_state.current_context->param->prev = NULL;
 
 				if (!lexMacroParamTokens(state, &state->pp_tokens,
 				                         state->pp_expansion_state.token_marker,

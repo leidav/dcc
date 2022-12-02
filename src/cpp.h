@@ -39,20 +39,27 @@ struct PreprocessorDefinitionSet {
 };
 
 struct TokenIterator {
-	uint16_t start;
+	int16_t start;
 	int16_t cur;
 	int16_t end;
 };
 
+struct ParamContext {
+	const struct TokenIterator* iterators;
+	uint8_t num_params;
+	struct ParamContext* prev;
+};
+
 struct ExpansionContext {
 	struct TokenIterator iterator;
-	struct TokenIterator* param_iterators;
-	uint8_t num_params;
+	struct ParamContext* param;
 	struct ExpansionContext* prev;
+	int depth;
 };
 
 struct PreprocessorExpansionState {
 	struct ExpansionContext* current_context;
+	// struct ParamContext* param_context;
 	int pos;
 	size_t memory_marker;
 	uint16_t token_marker;
