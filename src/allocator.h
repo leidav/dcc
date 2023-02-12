@@ -16,6 +16,8 @@
 struct Allocator {
 	void* (*allocate)(void* allocator, size_t size,
 	                  size_t power_of_two_alignment);
+	void* (*reallocate)(void* allocator, void* ptr, size_t new_size,
+	                    size_t power_of_two_alignment);
 	void (*deallocate)(void* allocator, void* ptr);
 };
 
@@ -24,6 +26,7 @@ struct LinearAllocator {
 	struct Allocator* parent_allocator;
 	void* start;
 	void* free;
+	void* last;
 	void* end;
 	bool memory_owned;
 };
@@ -31,6 +34,8 @@ struct LinearAllocator {
 void* allocateAligned(struct Allocator* allocator, size_t size,
                       size_t power_of_two_alignment);
 void* allocate(struct Allocator* allocator, size_t size);
+
+void* reallocate(struct Allocator* allocator, void* ptr, size_t new_size);
 
 void deallocate(struct Allocator* allocator, void* ptr);
 
@@ -48,5 +53,8 @@ void resetAllocatorState(struct LinearAllocator* allocator, size_t pos);
 
 void* allocateLinear(struct LinearAllocator* allocator, size_t size,
                      size_t power_of_two_alignment);
+
+void* reallocateLinear(struct LinearAllocator* allocator, void* ptr,
+                       size_t new_size, size_t power_of_two_alignment);
 
 #endif
