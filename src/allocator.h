@@ -9,9 +9,9 @@
 
 #define ALLOCATOR_CAST(allocator) ((struct Allocator*)(allocator))
 
-#define ALLOCATE_TYPE(allocator, num_elements, type)                \
-	((type*)allocateAligned(allocator, sizeof(type) * num_elements, \
-	                        alignof(type)))
+#define ALLOCATE_TYPE(allocator, num_elements, type)   \
+	((type*)allocateAligned(ALLOCATOR_CAST(allocator), \
+	                        sizeof(type) * num_elements, alignof(type)))
 
 struct Allocator {
 	void* (*allocate)(void* allocator, size_t size,

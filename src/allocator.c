@@ -33,6 +33,7 @@ void* reallocate(struct Allocator* allocator, void* ptr, size_t new_size)
 	if (allocator == NULL) {
 		return realloc(ptr, new_size);
 	}
+	return allocator->reallocate(allocator, ptr, new_size, 16);
 }
 
 void deallocate(struct Allocator* allocator, void* ptr)
@@ -87,6 +88,7 @@ int createLinearAllocatorFromBuffer(struct LinearAllocator* allocator,
 	allocator->parent_allocator = NULL;
 	allocator->end = buffer + size;
 	allocator->free = buffer;
+	allocator->last = buffer;
 	allocator->start = buffer;
 	allocator->memory_owned = false;
 	allocator->base.allocate = allocateLinearWrapper;

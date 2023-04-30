@@ -45,7 +45,7 @@ struct TokenIterator {
 };
 
 struct ParamContext {
-	struct ParamContext* parent;
+	const struct ParamContext* parent;
 	const struct TokenIterator* iterators;
 	uint8_t num_params;
 };
@@ -60,11 +60,15 @@ struct ExpansionContext {
 struct PreprocessorExpansionState {
 	struct ExpansionContext* current_context;
 	int pos;
-	size_t memory_marker;
 	uint16_t token_marker;
 	bool function_like;
 	bool begin_expansion;
 };
+
+struct TokenIterator* allocateIterators(struct LexerState* state,
+                                        int num_iterators);
+
+struct ExpansionContext* allocateExpansionContext(struct LexerState* state);
 
 static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
 {

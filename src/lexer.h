@@ -200,7 +200,8 @@ struct LexerState {
 	struct PreprocessorDefinitionSet pp_definitions;
 	struct PreprocessorExpansionState pp_expansion_state;
 	struct LexerConstantSet constants;
-	struct LinearAllocator* scratchpad;
+	struct LinearAllocator scratchpad;
+	struct LinearAllocator expansion_stack;
 };
 
 int initLexer(struct LexerState* state, const char* file_path);

@@ -8,7 +8,25 @@
 #include "lexer.h"
 #include "string_set.h"
 
-static bool expand(struct LexerState* state, struct PreprocessorToken* token);
+enum ExpansionResult {
+	EXPANSION_RESULT_TOKEN = 0,
+	EXPANSION_RESULT_ERROR = 1,
+	EXPANSION_RESULT_CONTINUE = 2
+};
+
+struct TokenIterator* allocateIterators(struct LexerState* state,
+                                        int num_iterators)
+{
+	return ALLOCATE_TYPE(&state->expansion_stack, num_iterators,
+	                     struct TokenIterator);
+}
+
+struct ExpansionContext* allocateExpansionContext(struct LexerState* state)
+{
+	return ALLOCATE_TYPE(&state->expansion_stack, 1, struct ExpansionContext);
+}
+
+static int expand(struct LexerState* state, struct PreprocessorToken* token);
 
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
                                size_t max_tokens, struct Allocator* allocator)
@@ -156,21 +174,19 @@ static struct PreprocessorToken* getTokenAt(struct LexerState* state, int index)
 static int pushContext(struct LexerState* state, const struct TokenIterator* it,
                        const struct ParamContext* params)
 {
-	struct ExpansionContext* context =
-	    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad), 1,
-	                  typeof(*state->pp_expansion_state.current_context));
+	struct ExpansionContext* context = allocateExpansionContext(state);
 
 	if (context == NULL) {
 		generalError("expansion stack full");
 		return -1;
 	}
-
 	context->prev = state->pp_expansion_state.current_context;
 	context->iterator.start = it->start;
 	context->iterator.cur = it->start;
 	context->iterator.end = it->end;
 	if (params != NULL) {
-		context->param.num_params = params->num_params;
+		int num = params->num_params;
+		context->param.num_params = num;
 		context->param.iterators = params->iterators;
 		context->param.parent = params->parent;
 	} else {
@@ -188,12 +204,11 @@ static void popContext(struct LexerState* state)
 	struct ExpansionContext* context =
 	    state->pp_expansion_state.current_context;
 
-	if (context->prev != NULL) {
-		state->pp_expansion_state.current_context = context->prev;
-	} else {
+	if (context->prev == NULL) {
 		fprintf(stderr, "invalid context pop\n");
 		exit(1);
 	}
+	state->pp_expansion_state.current_context = context->prev;
 }
 
 void beginExpansion(struct LexerState* state,
@@ -203,15 +218,12 @@ void beginExpansion(struct LexerState* state,
 	state->pp_expansion_state.pos = 0;
 	state->pp_expansion_state.function_like = isFunctionLike(definition);
 	state->pp_expansion_state.begin_expansion = true;
-	state->pp_expansion_state.memory_marker =
-	    markAllocatorState(state->scratchpad);
 	state->pp_expansion_state.token_marker = state->pp_tokens.num;
 	state->pp_expansion_state.current_context = NULL;
-	state->pp_expansion_state.current_context =
-	    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad), 1,
-	                  typeof(*state->pp_expansion_state.current_context));
+	state->pp_expansion_state.current_context = allocateExpansionContext(state);
 	state->pp_expansion_state.current_context->prev = NULL;
 	state->pp_expansion_state.current_context->param.iterators = NULL;
+	state->pp_expansion_state.current_context->param.parent = NULL;
 	state->pp_expansion_state.current_context->param.num_params =
 	    definition->num_params;
 
@@ -284,102 +296,117 @@ out:
 	return status;
 }
 
-bool expand(struct LexerState* state, struct PreprocessorToken* token)
+int expand(struct LexerState* state, struct PreprocessorToken* token)
 {
 	struct ExpansionContext* current_context =
 	    state->pp_expansion_state.current_context;
 	struct TokenIterator* it = &current_context->iterator;
-	bool status = true;
 
-	if (current_context->prev == NULL && it->cur > it->end) {
-		token->type = TOKEN_EOF;
-	} else if (it->cur <= it->end) {
-		struct PreprocessorToken* tok = getTokenAt(state, it->cur);
-		it->cur++;
-		if (tok->type == PP_PARAM) {
-			const struct ParamContext* param_context = &current_context->param;
-			if (param_context == NULL) {
-				generalError("param context is NULL");
-				return false;
-			}
-			struct ParamContext* param_context_parent = param_context->parent;
-			const struct TokenIterator* param_iterators =
-			    param_context->iterators;
-			if (param_iterators == NULL) {
-				generalError("Invalid param iterator");
-				return false;
-			}
+	if (it->cur > it->end) {
+		if (current_context->prev == NULL) {
+			token->type = TOKEN_EOF;
+			return EXPANSION_RESULT_TOKEN;
+		}
+		popContext(state);
+		return EXPANSION_RESULT_CONTINUE;
+	}
 
-			const struct TokenIterator* p = &param_iterators[tok->value_handle];
+	struct PreprocessorToken* tok = getTokenAt(state, it->cur);
+	it->cur++;
 
-			if (pushContext(state, p, param_context_parent) != 0) {
-				return false;
-			}
+	if (tok->type == PP_PARAM) {
+		const struct ParamContext* param_context = &current_context->param;
+		if (param_context == NULL) {
+			generalError("param context is NULL");
+			return EXPANSION_RESULT_ERROR;
+		}
 
-			status = expand(state, token);
+		const struct TokenIterator* param_iterators = param_context->iterators;
+		if (param_iterators == NULL) {
+			generalError("Invalid param iterator");
+			return EXPANSION_RESULT_ERROR;
+		}
 
-		} else if (tok->type == IDENTIFIER) {
-			int index = tok->value_handle;
-			const char* identifier = getStringAt(&state->identifiers, index);
-			uint32_t hash = getHashAt(&state->identifiers, index);
-			int length = getLengthAt(&state->identifiers, index);
-			struct PreprocessorDefinition* def =
-			    findDefinition(state, identifier, length, hash);
+		const struct TokenIterator* p = &param_iterators[tok->value_handle];
 
-			if (def != NULL) {
-				struct TokenIterator iter;
-				initTokenIterator(&iter, def);
+		const struct ParamContext* param_context_parent = param_context->parent;
+		const struct ParamContext* parent_parent = NULL;
+		if (param_context_parent != NULL) {
+			parent_parent = param_context_parent->parent;
+		}
 
-				struct TokenIterator* param_iterators = NULL;
-				int num_params = 0;
-				if (isFunctionLike(def)) {
-					if ((it->cur > it->end) ||
-					    (getTokenAt(state, it->cur)->type != PARENTHESE_LEFT)) {
-						lexerError(
-						    state,
-						    "asdf function like macro must be called like a "
-						    "function");
-						return false;
-					}
-					it->cur++;
-					num_params = def->num_params;
-					param_iterators =
-					    ALLOCATE_TYPE(ALLOCATOR_CAST(state->scratchpad),
-					                  num_params, typeof(*param_iterators));
+		if (pushContext(state, p, param_context_parent) != 0) {
+			return EXPANSION_RESULT_ERROR;
+		}
+		return EXPANSION_RESULT_CONTINUE;
+	}
+
+	if (tok->type == IDENTIFIER) {
+		int index = tok->value_handle;
+		const char* identifier = getStringAt(&state->identifiers, index);
+		uint32_t hash = getHashAt(&state->identifiers, index);
+		int length = getLengthAt(&state->identifiers, index);
+		struct PreprocessorDefinition* def =
+		    findDefinition(state, identifier, length, hash);
+
+		if (def != NULL) {
+			struct TokenIterator iter;
+			initTokenIterator(&iter, def);
+
+			struct TokenIterator* param_iterators = NULL;
+			int num_params = 0;
+			struct ParamContext param_context = {NULL, NULL, 0};
+			if (isFunctionLike(def)) {
+				if ((it->cur > it->end) ||
+				    (getTokenAt(state, it->cur)->type != PARENTHESE_LEFT)) {
+					lexerError(state,
+					           "function like macro must be called like a "
+					           "function");
+					return EXPANSION_RESULT_ERROR;
+				}
+				it->cur++;
+				num_params = def->num_params;
+
+				if (num_params > 0) {
+					param_iterators = allocateIterators(state, num_params);
+
 					if (param_iterators == NULL) {
-						return false;
+						return EXPANSION_RESULT_ERROR;
 					}
-
 					prepareMacroParamTokens(state, param_iterators, num_params);
-					const struct ParamContext param_context = {
-					    &current_context->param, param_iterators, num_params};
-					if (pushContext(state, &iter, &param_context) != 0) {
-						return false;
-					}
+
+					param_context.parent = &current_context->param;
+					param_context.iterators = param_iterators;
+					param_context.num_params = num_params;
+
 				} else {
-					if (pushContext(state, &iter, NULL) != 0) {
-						return false;
+					if (getTokenAt(state, it->cur)->type != PARENTHESE_RIGHT) {
+						lexerError(state, "macro parantheses not closed");
+						return EXPANSION_RESULT_ERROR;
 					}
 				}
-
-				status = expand(state, token);
-
-			} else {
-				*token = *tok;
 			}
-		} else {
-			*token = *tok;
+			if (pushContext(state, &iter, &param_context) != 0) {
+				return EXPANSION_RESULT_ERROR;
+			}
+
+			return EXPANSION_RESULT_CONTINUE;
 		}
-	} else {
-		popContext(state);
-		status = expand(state, token);
 	}
-	return status;
+	*token = *tok;
+	return EXPANSION_RESULT_TOKEN;
 }
 
 bool getExpandedToken(struct LexerState* state, struct PreprocessorToken* token)
 {
-	return expand(state, token);
+	int result;
+	int count = 0;
+	do {
+		result = expand(state, token);
+		count++;
+	} while (result == EXPANSION_RESULT_CONTINUE);
+
+	return result == EXPANSION_RESULT_ERROR ? false : true;
 }
 
 void stopExpansion(struct LexerState* state)
@@ -388,8 +415,6 @@ void stopExpansion(struct LexerState* state)
 	state->pp_expansion_state.begin_expansion = false;
 	state->pp_expansion_state.function_like = false;
 	state->expand_macro = false;
-	resetAllocatorState(state->scratchpad,
-	                    state->pp_expansion_state.memory_marker);
 	state->pp_tokens.num = state->pp_expansion_state.token_marker;
 }
 

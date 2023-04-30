@@ -21,5 +21,5 @@ target_sources(
   "${CMAKE_CURRENT_SOURCE_DIR}/error.h"
 )
 target_compile_features(dcc PRIVATE c_std_11)
-#target_compile_options(dcc PRIVATE -fsanitize=address)
-#target_link_options(dcc PRIVATE -fsanitize=address)
+target_compile_options(dcc PRIVATE -fsanitize=address,undefined)
+target_link_options(dcc PRIVATE -fsanitize=address,undefined)
