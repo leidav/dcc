@@ -14,14 +14,15 @@ enum ExpansionResult {
 	EXPANSION_RESULT_CONTINUE = 2
 };
 
-struct TokenIterator* allocateIterators(struct LexerState* state,
-                                        int num_iterators)
+static struct TokenIterator* allocateIterators(struct LexerState* state,
+                                               int num_iterators)
 {
 	return ALLOCATE_TYPE(&state->expansion_stack, num_iterators,
 	                     struct TokenIterator);
 }
 
-struct ExpansionContext* allocateExpansionContext(struct LexerState* state)
+static struct ExpansionContext* allocateExpansionContext(
+    struct LexerState* state)
 {
 	return ALLOCATE_TYPE(&state->expansion_stack, 1, struct ExpansionContext);
 }
@@ -232,17 +233,14 @@ void beginExpansion(struct LexerState* state,
 	                  definition);
 }
 
-static bool prepareMacroParamTokens(struct LexerState* state,
-                                    struct TokenIterator* params,
-                                    int expected_param_count)
+bool prepareMacroParamTokens(struct LexerState* state,
+                             struct TokenIterator* params,
+                             struct TokenIterator* iterator,
+                             int expected_param_count)
 {
-	struct ExpansionContext* current_context =
-	    state->pp_expansion_state.current_context;
-	struct TokenIterator* it = &current_context->iterator;
-
 	bool status = false;
 
-	int token_offset = it->cur;
+	int token_offset = iterator->cur;
 	int param_index = 0;
 	int counter = 1;
 	int16_t token_count = 0;
@@ -250,13 +248,14 @@ static bool prepareMacroParamTokens(struct LexerState* state,
 	params[0].start = token_offset;
 	params[0].cur = token_offset;
 	while (true) {
-		if (it->cur > it->end) {
+		if (iterator->cur > iterator->end) {
 			lexerError(state, "macro parantheses not closed");
 			goto out;
 		}
-		struct PreprocessorToken* token = getTokenAt(state, it->cur);
+		struct PreprocessorToken* token = getTokenAt(state, iterator->cur);
+		int type = token->type;
 
-		switch (token->type) {
+		switch (type) {
 			case PARENTHESE_LEFT:
 				counter++;
 				break;
@@ -279,7 +278,7 @@ static bool prepareMacroParamTokens(struct LexerState* state,
 				}
 				break;
 		}
-		it->cur++;
+		iterator->cur++;
 		if (counter == 0) {
 			params[param_index].end = token_count - 1 + token_offset;
 			break;
@@ -373,7 +372,9 @@ int expand(struct LexerState* state, struct PreprocessorToken* token)
 					if (param_iterators == NULL) {
 						return EXPANSION_RESULT_ERROR;
 					}
-					prepareMacroParamTokens(state, param_iterators, num_params);
+
+					prepareMacroParamTokens(state, param_iterators, it,
+					                        num_params);
 
 					param_context.parent = &current_context->param;
 					param_context.iterators = param_iterators;
@@ -415,6 +416,7 @@ void stopExpansion(struct LexerState* state)
 	state->pp_expansion_state.begin_expansion = false;
 	state->pp_expansion_state.function_like = false;
 	state->expand_macro = false;
+	resetLinearAllocatorState(&state->expansion_stack, 0);
 	state->pp_tokens.num = state->pp_expansion_state.token_marker;
 }
 

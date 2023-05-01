@@ -106,12 +106,12 @@ void destroyLinearAllocator(struct LinearAllocator* allocator)
 	allocator->end = NULL;
 }
 
-size_t markAllocatorState(struct LinearAllocator* allocator)
+size_t markLinearAllocatorState(struct LinearAllocator* allocator)
 {
 	return allocator->free - allocator->start;
 }
 
-void resetAllocatorState(struct LinearAllocator* allocator, size_t pos)
+void resetLinearAllocatorState(struct LinearAllocator* allocator, size_t pos)
 {
 	allocator->free = allocator->start + pos;
 }

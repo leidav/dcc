@@ -14,6 +14,9 @@
 #define MAX_PP_NUMBER_LENGTH 1024
 #define MAX_IDENTIFIER_LENGTH 256
 
+#define SCRATCHPAD_SIZE (4096 << 4)
+#define EXPANSION_STACK_SIZE (4096 << 4)
+
 #define NEXT(lexer_state, out_label)        \
 	if (!consumeLexableChar(lexer_state)) { \
 		goto out_label;                     \
@@ -28,6 +31,9 @@ struct StringIterator {
 	const char* start;
 	const char* cur;
 };
+
+#define ALLOCATE_STRING(allocator, length) \
+	allocate(ALLOCATOR_CAST(allocator), length);
 
 static bool parseNumber(struct StringIterator* it, struct LexerToken* token,
                         const struct FileContext* ctx);
@@ -511,8 +517,9 @@ int initLexer(struct LexerState* state, const char* file_path)
 	memset(&state->current_pos, 0, sizeof(state->current_pos));
 	memset(&state->lookahead_pos, 0, sizeof(state->lookahead_pos));
 	state->line_beginning = true;
-	createLinearAllocator(&state->scratchpad, 4096 << 4, NULL);
-	createLinearAllocator(&state->expansion_stack, 4096 << 4, NULL);
+
+	createLinearAllocator(&state->scratchpad, SCRATCHPAD_SIZE, NULL);
+	createLinearAllocator(&state->expansion_stack, EXPANSION_STACK_SIZE, NULL);
 
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
@@ -823,9 +830,8 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
                              const struct FileContext* ctx)
 {
 	int length = 0;
-	size_t marker = markAllocatorState(&state->scratchpad);
-	char* read_buffer =
-	    allocate(ALLOCATOR_CAST(&state->scratchpad), MAX_STRING_LENGTH);
+	size_t marker = markLinearAllocatorState(&state->scratchpad);
+	char* read_buffer = ALLOCATE_STRING(&state->scratchpad, MAX_STRING_LENGTH);
 	if (!read_buffer) {
 		return false;
 	}
@@ -852,7 +858,7 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	createStringConstantToken(token, ctx, index);
 	status = true;
 out:
-	resetAllocatorState(&state->scratchpad, marker);
+	resetLinearAllocatorState(&state->scratchpad, marker);
 	return true;
 }
 
@@ -931,9 +937,9 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
                     const struct FileContext* ctx)
 {
 	bool status = false;
-	size_t marker = markAllocatorState(&state->scratchpad);
+	size_t marker = markLinearAllocatorState(&state->scratchpad);
 	char* read_buffer =
-	    allocate(ALLOCATOR_CAST(&state->scratchpad), MAX_IDENTIFIER_LENGTH);
+	    ALLOCATE_STRING(&state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
 		goto out;
 	}
@@ -956,7 +962,7 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 		                                        length, hash);
 	}
 out:
-	resetAllocatorState(&state->scratchpad, marker);
+	resetLinearAllocatorState(&state->scratchpad, marker);
 	return status;
 }
 static const double exponent_lookup[] = {1e1,  1e2,  1e4, 1e8,
@@ -1253,10 +1259,10 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
                         const struct FileContext* ctx,
                         bool create_number_constant)
 {
-	size_t marker = markAllocatorState(&state->scratchpad);
+	size_t marker = markLinearAllocatorState(&state->scratchpad);
 	bool status = false;
 	char* read_buffer =
-	    allocate(ALLOCATOR_CAST(&state->scratchpad), MAX_PP_NUMBER_LENGTH);
+	    ALLOCATE_STRING(&state->scratchpad, MAX_PP_NUMBER_LENGTH);
 	if (!read_buffer) {
 		generalError("buffer allocation failed");
 		goto out;
@@ -1302,7 +1308,7 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
 	}
 	status = true;
 out:
-	resetAllocatorState(&state->scratchpad, marker);
+	resetLinearAllocatorState(&state->scratchpad, marker);
 	return status;
 }
 
@@ -1602,15 +1608,15 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 				createSimpleToken(&token, &macro_context, PP_STRINGIFY);
 			}
 		} else if (function_like && isAlphabetic(state->c)) {
-			size_t marker = markAllocatorState(&state->scratchpad);
-			char* read_buffer = allocate(ALLOCATOR_CAST(&state->scratchpad),
-			                             MAX_IDENTIFIER_LENGTH);
+			size_t marker = markLinearAllocatorState(&state->scratchpad);
+			char* read_buffer =
+			    ALLOCATE_STRING(&state->scratchpad, MAX_IDENTIFIER_LENGTH);
 			if (read_buffer == NULL) {
 				goto out;
 			}
 			int length = readWord(state, &macro_context, read_buffer);
 			if (length == 0) {
-				resetAllocatorState(&state->scratchpad, marker);
+				resetLinearAllocatorState(&state->scratchpad, marker);
 				goto out;
 			}
 			uint32_t hash = hashSubstring(read_buffer, length);
@@ -1621,7 +1627,7 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 				createKeywordOrIdentifierToken(state, &token, &macro_context,
 				                               read_buffer, length, hash);
 			}
-			resetAllocatorState(&state->scratchpad, marker);
+			resetLinearAllocatorState(&state->scratchpad, marker);
 		} else {
 			if (!lexTokens(state, &token, &macro_context)) {
 				goto out;
@@ -1667,7 +1673,7 @@ static bool handleDefineDirective(struct LexerState* state,
 	bool status = false;
 
 	struct StringSet params;
-	size_t marker = markAllocatorState(&state->scratchpad);
+	size_t marker = markLinearAllocatorState(&state->scratchpad);
 	if (createStringSet(&params, 256, 64, ALLOCATOR_CAST(&state->scratchpad)) !=
 	    0) {
 		goto out;
@@ -1735,7 +1741,7 @@ static bool handleDefineDirective(struct LexerState* state,
 	}
 	status = true;
 out:
-	resetAllocatorState(&state->scratchpad, marker);
+	resetLinearAllocatorState(&state->scratchpad, marker);
 	return status;
 }
 
@@ -1755,9 +1761,9 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 
 {
 	bool status = false;
-	size_t marker = markAllocatorState(&state->scratchpad);
+	size_t marker = markLinearAllocatorState(&state->scratchpad);
 	char* read_buffer =
-	    allocate(ALLOCATOR_CAST(&state->scratchpad), MAX_IDENTIFIER_LENGTH);
+	    ALLOCATE_STRING(&state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
 		generalError("Memory allocation failed");
 		goto out;
@@ -1822,75 +1828,79 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 	}
 	status = true;
 out:
-	resetAllocatorState(&state->scratchpad, marker);
+	resetLinearAllocatorState(&state->scratchpad, marker);
 	return status;
 }
 
 static bool lexMacroParamTokens(struct LexerState* state,
-                                struct PreprocessorTokenSet* token_set,
-                                int token_offset, struct TokenIterator* params,
-                                int expected_param_count)
+                                struct PreprocessorTokenSet* token_set)
 {
-	bool status = false;
+	int bracket_count = 1;
+	struct LexerToken token;
 	skipWhiteSpaceOrComments(state);
-
-	int param_index = 0;
-	int counter = 1;
-	int16_t token_count = 0;
-	int16_t token_start = 0;
-	params[0].cur = token_offset;
-	params[0].start = token_offset;
-	while (true) {
-		struct LexerToken token;
+	do {
 		struct FileContext macro_context;
 		getFileContext(state, &macro_context);
 		if (!lexTokens(state, &token, &macro_context)) {
-			goto out;
-		}
-		if (token.type == TOKEN_EOF) {
-			lexerError(state, "macro parantheses not closed");
-			goto out;
+			return false;
 		}
 
-		switch (token.type) {
-			case PARENTHESE_LEFT:
-				counter++;
-				break;
-			case PARENTHESE_RIGHT:
-				counter--;
-				break;
-			case COMMA:
-				if (counter == 1) {
-					if (param_index == expected_param_count - 1) {
-						lexerError(state, "to many macro parameters");
-						goto out;
-					}
-					params[param_index].cur = token_start + token_offset;
-					params[param_index].start = params[param_index].cur;
-					params[param_index].end = token_count - 1 + token_offset;
-					token_start = token_count + 1;
-					params[param_index + 1].cur = token_start + token_offset;
-					params[param_index + 1].start = params[param_index + 1].cur;
-					param_index++;
-				}
-				break;
+		if (token.type == PARENTHESE_LEFT) {
+			bracket_count++;
+		} else if (token.type == PARENTHESE_RIGHT) {
+			bracket_count--;
 		}
-		if (counter == 0) {
-			params[param_index].end = token_count - 1 + token_offset;
-			break;
-		} else {
-			if (addPreprocessorToken(state, token_set, &token) < 0) {
-				goto out;
-			}
+		if (addPreprocessorToken(state, token_set, &token) < 0) {
+			return false;
 		}
 		skipWhiteSpaceOrComments(state);
-		token_count++;
-	}
-	if (param_index < expected_param_count - 1) {
-		lexerError(state, "more macro parameters expected");
+		printToken(state, &token);
+	} while (bracket_count != 0 && token.type != TOKEN_EOF);
+
+out:
+	return true;
+}
+
+static bool beginFunctionLikeMacroExpansion(struct LexerState* state)
+
+{
+	bool status = false;
+	if (state->c != '(') {
+		lexerError(state, "function like macro must be called like a function");
+		stopExpansion(state);
 		goto out;
 	}
+	NEXT(state, out);
+	int param_count =
+	    state->pp_expansion_state.current_context->param.num_params;
+	if (param_count > 0) {
+		struct TokenIterator* param_iterators = ALLOCATE_TYPE(
+		    &state->expansion_stack, param_count, typeof(*param_iterators));
+		state->pp_expansion_state.current_context->param.iterators =
+		    param_iterators;
+		state->pp_expansion_state.current_context->param.parent = NULL;
 
+		int token_marker = state->pp_expansion_state.token_marker;
+
+		if (!lexMacroParamTokens(state, &state->pp_tokens)) {
+			stopExpansion(state);
+			goto out;
+		}
+		struct TokenIterator it = {token_marker, token_marker,
+		                           state->pp_tokens.num};
+		if (!prepareMacroParamTokens(state, param_iterators, &it,
+		                             param_count)) {
+			stopExpansion(state);
+			goto out;
+		}
+	} else {
+		skipWhiteSpaceOrComments(state);
+		if (state->c != ')') {
+			lexerError(state, "macro parantheses not closed");
+			stopExpansion(state);
+			goto out;
+		}
+	}
 	status = true;
 out:
 	return status;
@@ -1907,40 +1917,9 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 			if (state->pp_expansion_state.function_like &&
 			    state->pp_expansion_state.begin_expansion) {
 				state->pp_expansion_state.begin_expansion = false;
-				if (state->c != '(') {
-					lexerError(
-					    state,
-					    "function like macro must be called like a function");
-					stopExpansion(state);
-					goto out;
-				}
-				NEXT(state, out);
-				int param_count =
-				    state->pp_expansion_state.current_context->param.num_params;
-				if (param_count > 0) {
-					struct TokenIterator* param_iterators =
-					    allocateIterators(state, param_count);
-					state->pp_expansion_state.current_context->param.iterators =
-					    param_iterators;
-					state->pp_expansion_state.current_context->param.parent =
-					    NULL;
-
-					if (!lexMacroParamTokens(
-					        state, &state->pp_tokens,
-					        state->pp_expansion_state.token_marker,
-					        param_iterators, param_count)) {
-						stopExpansion(state);
-						goto out;
-					}
-				} else {
-					skipWhiteSpaceOrComments(state);
-					if (state->c != ')') {
-						lexerError(state, "macro parantheses not closed");
-						stopExpansion(state);
-						goto out;
-					}
-				}
+				beginFunctionLikeMacroExpansion(state);
 			}
+
 			struct PreprocessorToken pp_token;
 			if (!getExpandedToken(state, &pp_token)) {
 				stopExpansion(state);

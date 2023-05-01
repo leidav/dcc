@@ -65,11 +65,6 @@ struct PreprocessorExpansionState {
 	bool begin_expansion;
 };
 
-struct TokenIterator* allocateIterators(struct LexerState* state,
-                                        int num_iterators);
-
-struct ExpansionContext* allocateExpansionContext(struct LexerState* state);
-
 static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
 {
 	return definition->flags & FUNCTION_LIKE;
@@ -110,5 +105,10 @@ void stopExpansion(struct LexerState* state);
 
 void printPPToken(struct LexerState* state,
                   const struct PreprocessorToken* token);
+
+bool prepareMacroParamTokens(struct LexerState* state,
+                             struct TokenIterator* params,
+                             struct TokenIterator* iterator,
+                             int expected_param_count);
 
 #endif

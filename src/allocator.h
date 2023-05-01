@@ -47,9 +47,9 @@ int createLinearAllocatorFromBuffer(struct LinearAllocator* allocator,
 
 void destroyLinearAllocator(struct LinearAllocator* allocator);
 
-size_t markAllocatorState(struct LinearAllocator* allocator);
+size_t markLinearAllocatorState(struct LinearAllocator* allocator);
 
-void resetAllocatorState(struct LinearAllocator* allocator, size_t pos);
+void resetLinearAllocatorState(struct LinearAllocator* allocator, size_t pos);
 
 void* allocateLinear(struct LinearAllocator* allocator, size_t size,
                      size_t power_of_two_alignment);
