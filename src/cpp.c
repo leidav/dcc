@@ -220,7 +220,6 @@ void beginExpansion(struct LexerState* state,
 	state->pp_expansion_state.function_like = isFunctionLike(definition);
 	state->pp_expansion_state.begin_expansion = true;
 	state->pp_expansion_state.token_marker = state->pp_tokens.num;
-	state->pp_expansion_state.current_context = NULL;
 	state->pp_expansion_state.current_context = allocateExpansionContext(state);
 	state->pp_expansion_state.current_context->prev = NULL;
 	state->pp_expansion_state.current_context->param.iterators = NULL;
