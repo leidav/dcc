@@ -206,7 +206,7 @@ static void popContext(struct LexerState* state)
 	    state->pp_expansion_state.current_context;
 
 	if (context->prev == NULL) {
-		fprintf(stderr, "invalid context pop\n");
+		generalError("invalid context pop");
 		exit(1);
 	}
 	state->pp_expansion_state.current_context = context->prev;
