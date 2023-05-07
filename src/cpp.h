@@ -54,16 +54,15 @@ struct ExpansionContext {
 	struct TokenIterator iterator;
 	struct ParamContext param;
 	struct ExpansionContext* prev;
-	int depth;
 };
 
 struct PreprocessorExpansionState {
 	struct ExpansionContext* current_context;
-	int pos;
 	uint16_t token_marker;
 	bool function_like;
 	bool begin_expansion;
 };
+
 
 static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
 {

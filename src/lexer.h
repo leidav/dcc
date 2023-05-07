@@ -182,6 +182,7 @@ struct LexerSourcePos {
 	int file_pos;
 	int line_pos;
 };
+
 struct LexerState {
 	struct LexerSourcePos current_pos;
 	struct LexerSourcePos lookahead_pos;

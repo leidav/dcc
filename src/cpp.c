@@ -21,8 +21,7 @@ static struct TokenIterator* allocateIterators(struct LexerState* state,
 	                     struct TokenIterator);
 }
 
-static struct ExpansionContext* allocateExpansionContext(
-    struct LexerState* state)
+struct ExpansionContext* allocateExpansionContext(struct LexerState* state)
 {
 	return ALLOCATE_TYPE(&state->expansion_stack, 1, struct ExpansionContext);
 }
@@ -195,7 +194,6 @@ static int pushContext(struct LexerState* state, const struct TokenIterator* it,
 		context->param.num_params = 0;
 		context->param.parent = NULL;
 	}
-	context->depth = context->prev->depth + 1;
 	state->pp_expansion_state.current_context = context;
 	return 0;
 }
@@ -215,21 +213,27 @@ static void popContext(struct LexerState* state)
 void beginExpansion(struct LexerState* state,
                     struct PreprocessorDefinition* definition)
 {
-	state->expand_macro = true;
-	state->pp_expansion_state.pos = 0;
-	state->pp_expansion_state.function_like = isFunctionLike(definition);
-	state->pp_expansion_state.begin_expansion = true;
-	state->pp_expansion_state.token_marker = state->pp_tokens.num;
-	state->pp_expansion_state.current_context = allocateExpansionContext(state);
-	state->pp_expansion_state.current_context->prev = NULL;
-	state->pp_expansion_state.current_context->param.iterators = NULL;
-	state->pp_expansion_state.current_context->param.parent = NULL;
-	state->pp_expansion_state.current_context->param.num_params =
-	    definition->num_params;
+	struct PreprocessorExpansionState* pp_state = &state->pp_expansion_state;
 
-	state->pp_expansion_state.current_context->depth = 0;
-	initTokenIterator(&state->pp_expansion_state.current_context->iterator,
-	                  definition);
+	state->expand_macro = true;
+	pp_state->token_marker = state->pp_tokens.num;
+
+	pp_state->function_like = isFunctionLike(definition);
+	pp_state->begin_expansion = true;
+
+	pp_state->current_context = allocateExpansionContext(state);
+	pp_state->current_context->prev = NULL;
+
+	/*if (definition->num_params > 0) {
+	    pp_state->current_context->param.iterators =
+	        allocateIterators(state, definition->num_params);
+	}*/
+
+	pp_state->current_context->param.iterators = NULL;
+	    pp_state->current_context->param.parent = NULL;
+	pp_state->current_context->param.num_params = definition->num_params;
+
+	initTokenIterator(&pp_state->current_context->iterator, definition);
 }
 
 bool prepareMacroParamTokens(struct LexerState* state,
@@ -411,7 +415,6 @@ bool getExpandedToken(struct LexerState* state, struct PreprocessorToken* token)
 
 void stopExpansion(struct LexerState* state)
 {
-	state->pp_expansion_state.pos = -1;
 	state->pp_expansion_state.begin_expansion = false;
 	state->pp_expansion_state.function_like = false;
 	state->expand_macro = false;

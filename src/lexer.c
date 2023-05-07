@@ -49,6 +49,7 @@ static char next(struct StringIterator* it)
 }
 
 static bool consumeLexableChar(struct LexerState* state);
+
 static bool skipBackslashNewline(struct LexerState* state);
 
 static void getFileContext(struct LexerState* state, struct FileContext* ctx)
@@ -1865,22 +1866,24 @@ static bool beginFunctionLikeMacroExpansion(struct LexerState* state)
 
 {
 	bool status = false;
+	struct PreprocessorExpansionState* pp_state = &state->pp_expansion_state;
+
 	if (state->c != '(') {
 		lexerError(state, "function like macro must be called like a function");
 		stopExpansion(state);
 		goto out;
 	}
 	NEXT(state, out);
-	int param_count =
-	    state->pp_expansion_state.current_context->param.num_params;
+	int param_count = pp_state->current_context->param.num_params;
+	const struct TokenIterator* param_iterators =
+	    pp_state->current_context->param.iterators;
 	if (param_count > 0) {
 		struct TokenIterator* param_iterators = ALLOCATE_TYPE(
 		    &state->expansion_stack, param_count, typeof(*param_iterators));
-		state->pp_expansion_state.current_context->param.iterators =
-		    param_iterators;
-		state->pp_expansion_state.current_context->param.parent = NULL;
+		pp_state->current_context->param.iterators = param_iterators;
+		pp_state->current_context->param.parent = NULL;
 
-		int token_marker = state->pp_expansion_state.token_marker;
+		int token_marker = pp_state->token_marker;
 
 		if (!lexMacroParamTokens(state, &state->pp_tokens)) {
 			stopExpansion(state);
