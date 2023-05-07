@@ -58,11 +58,11 @@ struct ExpansionContext {
 
 struct PreprocessorExpansionState {
 	struct ExpansionContext* current_context;
+	struct LinearAllocator allocator;
 	uint16_t token_marker;
 	bool function_like;
 	bool begin_expansion;
 };
-
 
 static inline bool isFunctionLike(struct PreprocessorDefinition* definition)
 {

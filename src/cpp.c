@@ -17,13 +17,14 @@ enum ExpansionResult {
 static struct TokenIterator* allocateIterators(struct LexerState* state,
                                                int num_iterators)
 {
-	return ALLOCATE_TYPE(&state->expansion_stack, num_iterators,
+	return ALLOCATE_TYPE(&state->expansion_allocator, num_iterators,
 	                     struct TokenIterator);
 }
 
 struct ExpansionContext* allocateExpansionContext(struct LexerState* state)
 {
-	return ALLOCATE_TYPE(&state->expansion_stack, 1, struct ExpansionContext);
+	return ALLOCATE_TYPE(&state->expansion_allocator, 1,
+	                     struct ExpansionContext);
 }
 
 static int expand(struct LexerState* state, struct PreprocessorToken* token);
@@ -224,13 +225,8 @@ void beginExpansion(struct LexerState* state,
 	pp_state->current_context = allocateExpansionContext(state);
 	pp_state->current_context->prev = NULL;
 
-	/*if (definition->num_params > 0) {
-	    pp_state->current_context->param.iterators =
-	        allocateIterators(state, definition->num_params);
-	}*/
-
 	pp_state->current_context->param.iterators = NULL;
-	    pp_state->current_context->param.parent = NULL;
+	pp_state->current_context->param.parent = NULL;
 	pp_state->current_context->param.num_params = definition->num_params;
 
 	initTokenIterator(&pp_state->current_context->iterator, definition);
@@ -418,7 +414,7 @@ void stopExpansion(struct LexerState* state)
 	state->pp_expansion_state.begin_expansion = false;
 	state->pp_expansion_state.function_like = false;
 	state->expand_macro = false;
-	resetLinearAllocatorState(&state->expansion_stack, 0);
+	resetLinearAllocatorState(&state->expansion_allocator, 0);
 	state->pp_tokens.num = state->pp_expansion_state.token_marker;
 }
 
