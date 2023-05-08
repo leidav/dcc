@@ -105,6 +105,7 @@ void lexerError(struct LexerState* state, const char* reason)
 		               state->current_file.name, is_tty);
 	}
 }
+
 void generalError(const char* reason)
 {
 	bool is_tty = isatty(STDERR_FILENO) != 0;

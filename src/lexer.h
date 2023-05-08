@@ -19,8 +19,6 @@
 #define LEXER_MAX_PP_NUMBER_COUNT 1024
 #define LEXER_MAX_PP_CONSTANT_COUNT 1024
 
-#define LEXER_MAX_DEFINITION_COUNT 1024
-#define LEXER_MAX_DEFINITION_TOKEN_COUNT (4096 << 2)
 
 #define LEXER_IS_PREPROCESSOR_MACRO 0x1
 
@@ -197,12 +195,9 @@ struct LexerState {
 	struct StringSet identifiers;
 	struct StringSet string_literals;
 	struct StringSet pp_numbers;
-	struct PreprocessorTokenSet pp_tokens;
-	struct PreprocessorDefinitionSet pp_definitions;
-	struct PreprocessorExpansionState pp_expansion_state;
 	struct LexerConstantSet constants;
+	struct PreprocessorState pp_state;
 	struct LinearAllocator* scratchpad;
-	struct LinearAllocator expansion_allocator;
 };
 
 int initLexer(struct LexerState* state, const char* file_path);

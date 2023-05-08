@@ -8,26 +8,49 @@
 #include "lexer.h"
 #include "string_set.h"
 
+#define EXPANSION_STACK_SIZE (4096 << 4)
+
 enum ExpansionResult {
 	EXPANSION_RESULT_TOKEN = 0,
 	EXPANSION_RESULT_ERROR = 1,
 	EXPANSION_RESULT_CONTINUE = 2
 };
 
-static struct TokenIterator* allocateIterators(struct LexerState* state,
+static struct TokenIterator* allocateIterators(struct PreprocessorState* state,
                                                int num_iterators)
 {
-	return ALLOCATE_TYPE(&state->expansion_allocator, num_iterators,
+	return ALLOCATE_TYPE(&state->allocator, num_iterators,
 	                     struct TokenIterator);
 }
 
-struct ExpansionContext* allocateExpansionContext(struct LexerState* state)
+struct ExpansionContext* allocateExpansionContext(
+    struct PreprocessorState* state)
 {
-	return ALLOCATE_TYPE(&state->expansion_allocator, 1,
-	                     struct ExpansionContext);
+	return ALLOCATE_TYPE(&state->allocator, 1, struct ExpansionContext);
 }
 
-static int expand(struct LexerState* state, struct PreprocessorToken* token);
+static int expand(struct PreprocessorState* state,
+                  struct StringSet* identifiers,
+                  struct PreprocessorToken* token);
+
+int initPreprocessorState(struct PreprocessorState* state)
+{
+	if (createLinearAllocator(&state->allocator, EXPANSION_STACK_SIZE, NULL)) {
+		return -1;
+	}
+
+	if (createPreprocessorTokenSet(&state->tokens,
+	                               PREPROCESSOR_MAX_DEFINITION_TOKEN_COUNT,
+	                               NULL) != 0) {
+		return -1;
+	}
+	if (createPreprocessorDefinitionSet(
+	        &state->definitions, PREPROCESSOR_MAX_DEFINITION_COUNT,
+	        LEXER_PP_NUMBER_STRINGSET_SIZE, NULL) != 0) {
+		return -1;
+	}
+	return 0;
+}
 
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
                                size_t max_tokens, struct Allocator* allocator)
@@ -65,21 +88,11 @@ int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
 	return 0;
 }
 
-int addPreprocessorPPToken(struct LexerState* state,
-                           struct PreprocessorTokenSet* tokens,
-                           const struct PreprocessorToken* token)
-{
-	if (tokens->num == tokens->max_tokens) {
-		generalError("not enough memory to store token");
-		return -1;
-	}
-	tokens->tokens[tokens->num] = *token;
-	return ++tokens->num;
-}
-int addPreprocessorToken(struct LexerState* state,
-                         struct PreprocessorTokenSet* tokens,
+int addPreprocessorToken(struct PreprocessorState* state,
+                         struct LexerConstantSet* constants,
                          const struct LexerToken* token)
 {
+	struct PreprocessorTokenSet* tokens = &state->tokens;
 	if (tokens->num == tokens->max_tokens) {
 		generalError("not enough memory to store token");
 		return -1;
@@ -93,14 +106,14 @@ int addPreprocessorToken(struct LexerState* state,
 		if (token->type == LITERAL_STRING || token->type == PP_NUMBER) {
 			pp_token->value_handle = token->value.string_index;
 		} else {
-			int index = state->constants.num;
-			if (index == state->constants.max_count) {
+			int index = constants->num;
+			if (index == constants->max_count) {
 				generalError("not enough memory to store numeric constant");
 				return -1;
 			}
-			state->constants.constants[index] = token->value;
+			constants->constants[index] = token->value;
 			pp_token->value_handle = index;
-			state->constants.num++;
+			constants->num++;
 		}
 	}
 	if (token->type == IDENTIFIER) {
@@ -112,12 +125,23 @@ int addPreprocessorToken(struct LexerState* state,
 	return ++tokens->num;
 }
 
-int createPreprocessorDefinition(struct LexerState* state, int token_start,
-                                 int num_tokens, int num_params,
-                                 const char* name, int name_length,
-                                 bool function_like)
+struct PreprocessorTokenSet* getPreprocessorTokenSet(
+    struct PreprocessorState* state)
 {
-	struct PreprocessorDefinitionSet* definitions = &state->pp_definitions;
+	return &state->tokens;
+}
+
+int getPreprocessorTokenPos(struct PreprocessorState* state)
+{
+	return state->tokens.num;
+}
+
+int createPreprocessorDefinition(struct PreprocessorState* state,
+                                 int start_index, int num_tokens,
+                                 int num_params, const char* name,
+                                 int name_length, bool function_like)
+{
+	struct PreprocessorDefinitionSet* definitions = &state->definitions;
 
 	int hash = hashSubstring(name, name_length);
 
@@ -132,7 +156,7 @@ int createPreprocessorDefinition(struct LexerState* state, int token_start,
 	}
 
 	struct PreprocessorDefinition* def = &definitions->definitions[index];
-	def->token_start = token_start;
+	def->token_start = start_index;
 	def->num_tokens = num_tokens;
 	def->num_params = num_params;
 	def->flags = 0;
@@ -142,16 +166,16 @@ int createPreprocessorDefinition(struct LexerState* state, int token_start,
 	return index;
 }
 
-struct PreprocessorDefinition* findDefinition(struct LexerState* state,
+struct PreprocessorDefinition* findDefinition(struct PreprocessorState* state,
                                               const char* name, int length,
                                               uint32_t hash)
 {
-	int index = findIndex(&state->pp_definitions.pp_definition_names, name,
-	                      length, hash);
+	int index =
+	    findIndex(&state->definitions.pp_definition_names, name, length, hash);
 	if (index < 0) {
 		return NULL;
 	}
-	return &state->pp_definitions.definitions[index];
+	return &state->definitions.definitions[index];
 }
 
 static void initTokenIterator(struct TokenIterator* it,
@@ -167,12 +191,14 @@ static void resetTokenIterator(struct TokenIterator* it)
 	it->cur = it->start;
 }
 
-static struct PreprocessorToken* getTokenAt(struct LexerState* state, int index)
+static struct PreprocessorToken* getTokenAt(struct PreprocessorState* state,
+                                            int index)
 {
-	return &state->pp_tokens.tokens[index];
+	return &state->tokens.tokens[index];
 }
 
-static int pushContext(struct LexerState* state, const struct TokenIterator* it,
+static int pushContext(struct PreprocessorState* state,
+                       const struct TokenIterator* it,
                        const struct ParamContext* params)
 {
 	struct ExpansionContext* context = allocateExpansionContext(state);
@@ -181,7 +207,7 @@ static int pushContext(struct LexerState* state, const struct TokenIterator* it,
 		generalError("expansion stack full");
 		return -1;
 	}
-	context->prev = state->pp_expansion_state.current_context;
+	context->prev = state->expansion_state.current_context;
 	context->iterator.start = it->start;
 	context->iterator.cur = it->start;
 	context->iterator.end = it->end;
@@ -195,44 +221,43 @@ static int pushContext(struct LexerState* state, const struct TokenIterator* it,
 		context->param.num_params = 0;
 		context->param.parent = NULL;
 	}
-	state->pp_expansion_state.current_context = context;
+	state->expansion_state.current_context = context;
 	return 0;
 }
 
-static void popContext(struct LexerState* state)
+static void popContext(struct PreprocessorState* state)
 {
-	struct ExpansionContext* context =
-	    state->pp_expansion_state.current_context;
+	struct ExpansionContext* context = state->expansion_state.current_context;
 
 	if (context->prev == NULL) {
 		generalError("invalid context pop");
 		exit(1);
 	}
-	state->pp_expansion_state.current_context = context->prev;
+	state->expansion_state.current_context = context->prev;
 }
 
-void beginExpansion(struct LexerState* state,
+void beginExpansion(struct PreprocessorState* state,
                     struct PreprocessorDefinition* definition)
 {
-	struct PreprocessorExpansionState* pp_state = &state->pp_expansion_state;
+	struct PreprocessorExpansionState* expansion_state =
+	    &state->expansion_state;
 
-	state->expand_macro = true;
-	pp_state->token_marker = state->pp_tokens.num;
+	expansion_state->token_marker = state->tokens.num;
 
-	pp_state->function_like = isFunctionLike(definition);
-	pp_state->begin_expansion = true;
+	expansion_state->function_like = isFunctionLike(definition);
+	expansion_state->begin_expansion = true;
 
-	pp_state->current_context = allocateExpansionContext(state);
-	pp_state->current_context->prev = NULL;
+	expansion_state->current_context = allocateExpansionContext(state);
+	expansion_state->current_context->prev = NULL;
 
-	pp_state->current_context->param.iterators = NULL;
-	pp_state->current_context->param.parent = NULL;
-	pp_state->current_context->param.num_params = definition->num_params;
+	expansion_state->current_context->param.iterators = NULL;
+	expansion_state->current_context->param.parent = NULL;
+	expansion_state->current_context->param.num_params = definition->num_params;
 
-	initTokenIterator(&pp_state->current_context->iterator, definition);
+	initTokenIterator(&expansion_state->current_context->iterator, definition);
 }
 
-bool prepareMacroParamTokens(struct LexerState* state,
+bool prepareMacroParamTokens(struct PreprocessorState* state,
                              struct TokenIterator* params,
                              struct TokenIterator* iterator,
                              int expected_param_count)
@@ -248,7 +273,7 @@ bool prepareMacroParamTokens(struct LexerState* state,
 	params[0].cur = token_offset;
 	while (true) {
 		if (iterator->cur > iterator->end) {
-			lexerError(state, "macro parantheses not closed");
+			generalError("macro parantheses not closed");
 			goto out;
 		}
 		struct PreprocessorToken* token = getTokenAt(state, iterator->cur);
@@ -264,7 +289,7 @@ bool prepareMacroParamTokens(struct LexerState* state,
 			case COMMA:
 				if (counter == 1) {
 					if (param_index == expected_param_count - 1) {
-						lexerError(state, "to many macro parameters");
+						generalError("to many macro parameters");
 						goto out;
 					}
 					params[param_index].cur = token_start + token_offset;
@@ -286,7 +311,7 @@ bool prepareMacroParamTokens(struct LexerState* state,
 		token_count++;
 	}
 	if (param_index < expected_param_count - 1) {
-		lexerError(state, "more macro parameters expected");
+		generalError("more macro parameters expected");
 		goto out;
 	}
 	status = true;
@@ -294,10 +319,11 @@ out:
 	return status;
 }
 
-int expand(struct LexerState* state, struct PreprocessorToken* token)
+int expand(struct PreprocessorState* state, struct StringSet* identifiers,
+           struct PreprocessorToken* token)
 {
 	struct ExpansionContext* current_context =
-	    state->pp_expansion_state.current_context;
+	    state->expansion_state.current_context;
 	struct TokenIterator* it = &current_context->iterator;
 
 	if (it->cur > it->end) {
@@ -341,9 +367,9 @@ int expand(struct LexerState* state, struct PreprocessorToken* token)
 
 	if (tok->type == IDENTIFIER) {
 		int index = tok->value_handle;
-		const char* identifier = getStringAt(&state->identifiers, index);
-		uint32_t hash = getHashAt(&state->identifiers, index);
-		int length = getLengthAt(&state->identifiers, index);
+		const char* identifier = getStringAt(identifiers, index);
+		uint32_t hash = getHashAt(identifiers, index);
+		int length = getLengthAt(identifiers, index);
 		struct PreprocessorDefinition* def =
 		    findDefinition(state, identifier, length, hash);
 
@@ -357,9 +383,9 @@ int expand(struct LexerState* state, struct PreprocessorToken* token)
 			if (isFunctionLike(def)) {
 				if ((it->cur > it->end) ||
 				    (getTokenAt(state, it->cur)->type != PARENTHESE_LEFT)) {
-					lexerError(state,
-					           "function like macro must be called like a "
-					           "function");
+					generalError(
+					    "function like macro must be called like a "
+					    "function");
 					return EXPANSION_RESULT_ERROR;
 				}
 				it->cur++;
@@ -381,7 +407,7 @@ int expand(struct LexerState* state, struct PreprocessorToken* token)
 
 				} else {
 					if (getTokenAt(state, it->cur)->type != PARENTHESE_RIGHT) {
-						lexerError(state, "macro parantheses not closed");
+						generalError("macro parantheses not closed");
 						return EXPANSION_RESULT_ERROR;
 					}
 				}
@@ -397,25 +423,26 @@ int expand(struct LexerState* state, struct PreprocessorToken* token)
 	return EXPANSION_RESULT_TOKEN;
 }
 
-bool getExpandedToken(struct LexerState* state, struct PreprocessorToken* token)
+bool getExpandedToken(struct PreprocessorState* state,
+                      struct StringSet* identifier,
+                      struct PreprocessorToken* token)
 {
 	int result;
 	int count = 0;
 	do {
-		result = expand(state, token);
+		result = expand(state, identifier, token);
 		count++;
 	} while (result == EXPANSION_RESULT_CONTINUE);
 
 	return result == EXPANSION_RESULT_ERROR ? false : true;
 }
 
-void stopExpansion(struct LexerState* state)
+void stopExpansion(struct PreprocessorState* state)
 {
-	state->pp_expansion_state.begin_expansion = false;
-	state->pp_expansion_state.function_like = false;
-	state->expand_macro = false;
-	resetLinearAllocatorState(&state->expansion_allocator, 0);
-	state->pp_tokens.num = state->pp_expansion_state.token_marker;
+	state->expansion_state.begin_expansion = false;
+	state->expansion_state.function_like = false;
+	resetLinearAllocatorState(&state->allocator, 0);
+	state->tokens.num = state->expansion_state.token_marker;
 }
 
 void printPPToken(struct LexerState* state,

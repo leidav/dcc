@@ -40,36 +40,35 @@ int main(int argc, const char** argv)
 	}
 	bool validInput = true;
 	while (validInput) {
-		       struct LexerToken token;
-		       validInput = getNextToken(&lexer_state, &token);
-		       if (!validInput) {
-			       lexerError(&lexer_state,
-			                  "An unexpected error occured during lexing");
-			       exit(1);
-		       } else {
-			       printToken(&lexer_state, &token);
-		       }
+		struct LexerToken token;
+		validInput = getNextToken(&lexer_state, &token);
+		if (!validInput) {
+			lexerError(&lexer_state,
+			           "An unexpected error occured during lexing");
+			exit(1);
+		} else {
+			printToken(&lexer_state, &token);
+		}
 
-		       if (token.type == TOKEN_EOF) {
-			       break;
-		       }
+		if (token.type == TOKEN_EOF) {
+			break;
+		}
 	}
-	for (int i = 0; i < lexer_state.pp_definitions.pp_definition_names.num;
-	     i++) {
-		       printf("begin %s\n",
-		              getStringAt(
-		                  &lexer_state.pp_definitions.pp_definition_names, i));
-		       int start =
-		           lexer_state.pp_definitions.definitions[i].token_start;
-		       int end =
-		           lexer_state.pp_definitions.definitions[i].num_tokens + start;
-		       for (int j = start; j < end; j++) {
-			       struct PreprocessorToken* pp_token =
-			           &lexer_state.pp_tokens.tokens[j];
-			       struct LexerToken t;
-			       createLexerTokenFromPPToken(&lexer_state, pp_token, &t);
-			       printToken(&lexer_state, &t);
-		       }
+	for (int i = 0;
+	     i < lexer_state.pp_state.definitions.pp_definition_names.num; i++) {
+		printf("begin %s\n",
+		       getStringAt(
+		           &lexer_state.pp_state.definitions.pp_definition_names, i));
+		int start = lexer_state.pp_state.definitions.definitions[i].token_start;
+		int end =
+		    lexer_state.pp_state.definitions.definitions[i].num_tokens + start;
+		for (int j = start; j < end; j++) {
+			struct PreprocessorToken* pp_token =
+			    &lexer_state.pp_state.tokens.tokens[j];
+			struct LexerToken t;
+			createLexerTokenFromPPToken(&lexer_state, pp_token, &t);
+			printToken(&lexer_state, &t);
+		}
 	}
 	return 0;
 }
