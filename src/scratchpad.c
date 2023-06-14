@@ -12,7 +12,7 @@ int scratchpadInit()
 	return 0;
 }
 
-struct LinearAllocator* getScratchpadAllocator()
+struct Allocator* getScratchpadAllocator()
 {
-	return &allocator;
+	return (struct Allocator*)&allocator;
 }

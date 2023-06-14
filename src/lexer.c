@@ -515,7 +515,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	memset(&state->current_pos, 0, sizeof(state->current_pos));
 	memset(&state->lookahead_pos, 0, sizeof(state->lookahead_pos));
 	state->line_beginning = true;
-	state->scratchpad = getScratchpadAllocator();
+	state->scratchpad = (struct LinearAllocator*)getScratchpadAllocator();
 
 	if (openInputFile(&state->current_file, file_path, fileName(file_path)) !=
 	    0) {
@@ -1849,7 +1849,6 @@ static bool lexMacroParamTokens(struct LexerState* state,
 			return false;
 		}
 		skipWhiteSpaceOrComments(state);
-		printToken(state, &token);
 	} while (bracket_count != 0 && token.type != TOKEN_EOF);
 
 out:
@@ -1919,10 +1918,15 @@ bool getNextToken(struct LexerState* state, struct LexerToken* token)
 		if (state->expand_macro) {
 			struct PreprocessorExpansionState* expansion_state =
 			    &state->pp_state.expansion_state;
+
 			if (expansion_state->function_like &&
 			    expansion_state->begin_expansion) {
 				expansion_state->begin_expansion = false;
-				beginFunctionLikeMacroExpansion(state);
+				if (!beginFunctionLikeMacroExpansion(state)) {
+					stopExpansion(&state->pp_state);
+					state->expand_macro = false;
+					goto out;
+				}
 			}
 
 			struct PreprocessorToken pp_token;

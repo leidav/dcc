@@ -57,12 +57,13 @@ struct ParamContext {
 struct ExpansionContext {
 	struct TokenIterator iterator;
 	struct ParamContext param;
-	struct ExpansionContext* prev;
 };
 
 struct PreprocessorExpansionState {
 	struct ExpansionContext* current_context;
-	uint16_t token_marker;
+	struct ExpansionContext* expansion_stack;
+	int expansion_depth;
+	int token_marker;
 	bool function_like;
 	bool begin_expansion;
 };

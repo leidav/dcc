@@ -8,7 +8,7 @@
 #include "lexer.h"
 #include "string_set.h"
 
-#define EXPANSION_STACK_SIZE (4096 << 4)
+#define SCRATCHPAD_SIZE (4096 << 0)
 
 enum ExpansionResult {
 	EXPANSION_RESULT_TOKEN = 0,
@@ -23,19 +23,13 @@ static struct TokenIterator* allocateIterators(struct PreprocessorState* state,
 	                     struct TokenIterator);
 }
 
-struct ExpansionContext* allocateExpansionContext(
-    struct PreprocessorState* state)
-{
-	return ALLOCATE_TYPE(&state->allocator, 1, struct ExpansionContext);
-}
-
 static int expand(struct PreprocessorState* state,
                   struct StringSet* identifiers,
                   struct PreprocessorToken* token);
 
 int initPreprocessorState(struct PreprocessorState* state)
 {
-	if (createLinearAllocator(&state->allocator, EXPANSION_STACK_SIZE, NULL)) {
+	if (createLinearAllocator(&state->allocator, SCRATCHPAD_SIZE, NULL)) {
 		return -1;
 	}
 
@@ -49,6 +43,11 @@ int initPreprocessorState(struct PreprocessorState* state)
 	        LEXER_PP_NUMBER_STRINGSET_SIZE, NULL) != 0) {
 		return -1;
 	}
+
+	state->expansion_state.expansion_stack =
+	    malloc(sizeof(*state->expansion_state.expansion_stack) *
+	           PREPROCESSOR_MAX_EXPANSION_DEPTH);
+	state->expansion_state.expansion_depth = 0;
 	return 0;
 }
 
@@ -201,13 +200,16 @@ static int pushContext(struct PreprocessorState* state,
                        const struct TokenIterator* it,
                        const struct ParamContext* params)
 {
-	struct ExpansionContext* context = allocateExpansionContext(state);
-
-	if (context == NULL) {
+	if (++state->expansion_state.expansion_depth ==
+	    PREPROCESSOR_MAX_EXPANSION_DEPTH) {
 		generalError("expansion stack full");
 		return -1;
 	}
-	context->prev = state->expansion_state.current_context;
+
+	int expansion_depth = state->expansion_state.expansion_depth;
+	struct ExpansionContext* context =
+	    &state->expansion_state.expansion_stack[expansion_depth];
+
 	context->iterator.start = it->start;
 	context->iterator.cur = it->start;
 	context->iterator.end = it->end;
@@ -227,13 +229,13 @@ static int pushContext(struct PreprocessorState* state,
 
 static void popContext(struct PreprocessorState* state)
 {
-	struct ExpansionContext* context = state->expansion_state.current_context;
-
-	if (context->prev == NULL) {
+	if (--state->expansion_state.expansion_depth == -1) {
 		generalError("invalid context pop");
 		exit(1);
 	}
-	state->expansion_state.current_context = context->prev;
+	int expansion_depth = state->expansion_state.expansion_depth;
+	state->expansion_state.current_context =
+	    &state->expansion_state.expansion_stack[expansion_depth];
 }
 
 void beginExpansion(struct PreprocessorState* state,
@@ -247,8 +249,9 @@ void beginExpansion(struct PreprocessorState* state,
 	expansion_state->function_like = isFunctionLike(definition);
 	expansion_state->begin_expansion = true;
 
-	expansion_state->current_context = allocateExpansionContext(state);
-	expansion_state->current_context->prev = NULL;
+	expansion_state->expansion_depth = 0;
+
+	expansion_state->current_context = &expansion_state->expansion_stack[0];
 
 	expansion_state->current_context->param.iterators = NULL;
 	expansion_state->current_context->param.parent = NULL;
@@ -327,7 +330,7 @@ int expand(struct PreprocessorState* state, struct StringSet* identifiers,
 	struct TokenIterator* it = &current_context->iterator;
 
 	if (it->cur > it->end) {
-		if (current_context->prev == NULL) {
+		if (state->expansion_state.expansion_depth == 0) {
 			token->type = TOKEN_EOF;
 			return EXPANSION_RESULT_TOKEN;
 		}
