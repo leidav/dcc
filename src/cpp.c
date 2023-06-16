@@ -223,7 +223,6 @@ static int pushContext(struct PreprocessorState* state,
 		context->param.num_params = 0;
 		context->param.parent = NULL;
 	}
-	state->expansion_state.current_context = context;
 	return 0;
 }
 
@@ -234,8 +233,6 @@ static void popContext(struct PreprocessorState* state)
 		exit(1);
 	}
 	int expansion_depth = state->expansion_state.expansion_depth;
-	state->expansion_state.current_context =
-	    &state->expansion_state.expansion_stack[expansion_depth];
 }
 
 void beginExpansion(struct PreprocessorState* state,
@@ -251,13 +248,22 @@ void beginExpansion(struct PreprocessorState* state,
 
 	expansion_state->expansion_depth = 0;
 
-	expansion_state->current_context = &expansion_state->expansion_stack[0];
+	struct ExpansionContext* current_context =
+	    &expansion_state->expansion_stack[0];
 
-	expansion_state->current_context->param.iterators = NULL;
-	expansion_state->current_context->param.parent = NULL;
-	expansion_state->current_context->param.num_params = definition->num_params;
+	current_context->param.iterators = NULL;
+	current_context->param.parent = NULL;
+	current_context->param.num_params = definition->num_params;
 
-	initTokenIterator(&expansion_state->current_context->iterator, definition);
+	initTokenIterator(&current_context->iterator, definition);
+}
+
+void stopExpansion(struct PreprocessorState* state)
+{
+	state->expansion_state.begin_expansion = false;
+	state->expansion_state.function_like = false;
+	resetLinearAllocatorState(&state->allocator, 0);
+	state->tokens.num = state->expansion_state.token_marker;
 }
 
 bool prepareMacroParamTokens(struct PreprocessorState* state,
@@ -325,8 +331,10 @@ out:
 int expand(struct PreprocessorState* state, struct StringSet* identifiers,
            struct PreprocessorToken* token)
 {
+	int expansion_depth = state->expansion_state.expansion_depth;
+
 	struct ExpansionContext* current_context =
-	    state->expansion_state.current_context;
+	    &state->expansion_state.expansion_stack[expansion_depth];
 	struct TokenIterator* it = &current_context->iterator;
 
 	if (it->cur > it->end) {
@@ -438,14 +446,6 @@ bool getExpandedToken(struct PreprocessorState* state,
 	} while (result == EXPANSION_RESULT_CONTINUE);
 
 	return result == EXPANSION_RESULT_ERROR ? false : true;
-}
-
-void stopExpansion(struct PreprocessorState* state)
-{
-	state->expansion_state.begin_expansion = false;
-	state->expansion_state.function_like = false;
-	resetLinearAllocatorState(&state->allocator, 0);
-	state->tokens.num = state->expansion_state.token_marker;
 }
 
 void printPPToken(struct LexerState* state,

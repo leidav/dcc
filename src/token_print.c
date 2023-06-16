@@ -152,7 +152,7 @@ void printToken(struct LexerState* state, const struct LexerToken* token)
 	} else if ((token->type == CONSTANT_INT) ||
 	           (token->type == CONSTANT_UNSIGNED_INT)) {
 		uint64_t value = token->value.int_literal;
-		printf("line:%d, column: %d, type: LITERAL_INT, value: %llu\n",
+		printf("line:%d, column: %d, type: LITERAL_INT, value: %lu\n",
 		       token->line + 1, token->column + 1, value);
 	} else if (token->type == CONSTANT_DOUBLE) {
 		double value = token->value.double_literal;

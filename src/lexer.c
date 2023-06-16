@@ -1870,14 +1870,18 @@ static bool beginFunctionLikeMacroExpansion(struct LexerState* state)
 		goto out;
 	}
 	NEXT(state, out);
-	int param_count = expansion_state->current_context->param.num_params;
+
+	int expansion_depth = expansion_state->expansion_depth;
+	struct ExpansionContext* current_context =
+	    &expansion_state->expansion_stack[expansion_depth];
+	int param_count = current_context->param.num_params;
 	const struct TokenIterator* param_iterators =
-	    expansion_state->current_context->param.iterators;
+	    current_context->param.iterators;
 	if (param_count > 0) {
 		struct TokenIterator* param_iterators = ALLOCATE_TYPE(
 		    &pp_state->allocator, param_count, typeof(*param_iterators));
-		expansion_state->current_context->param.iterators = param_iterators;
-		expansion_state->current_context->param.parent = NULL;
+		current_context->param.iterators = param_iterators;
+		current_context->param.parent = NULL;
 
 		int token_marker = expansion_state->token_marker;
 
@@ -1908,70 +1912,83 @@ out:
 	return status;
 }
 
+static bool getNextTokenFromMacro(struct LexerState* state,
+                                  struct LexerToken* token,
+                                  struct FileContext* ctx)
+{
+	bool status = false;
+	struct PreprocessorExpansionState* expansion_state =
+	    &state->pp_state.expansion_state;
+
+	if (expansion_state->function_like && expansion_state->begin_expansion) {
+		expansion_state->begin_expansion = false;
+		if (!beginFunctionLikeMacroExpansion(state)) {
+			stopExpansion(&state->pp_state);
+			state->expand_macro = false;
+			goto out;
+		}
+	}
+
+	struct PreprocessorToken pp_token;
+	if (!getExpandedToken(&state->pp_state, &state->identifiers, &pp_token)) {
+		stopExpansion(&state->pp_state);
+		state->expand_macro = false;
+		goto out;
+	}
+
+	if (pp_token.type == TOKEN_EOF) {
+		createSimpleToken(token, ctx, TOKEN_EMPTY);
+		stopExpansion(&state->pp_state);
+		state->expand_macro = false;
+	} else {
+		if (!createLexerTokenFromPPToken(state, &pp_token, token)) {
+			stopExpansion(&state->pp_state);
+			state->expand_macro = false;
+			goto out;
+		}
+	}
+	status = true;
+out:
+	return status;
+}
+
 bool getNextToken(struct LexerState* state, struct LexerToken* token)
 {
 	struct FileContext ctx;
 	bool status = false;
 	do {
 		skipWhiteSpaceOrComments(state);
+		getFileContext(state, &ctx);
 
 		if (state->expand_macro) {
-			struct PreprocessorExpansionState* expansion_state =
-			    &state->pp_state.expansion_state;
-
-			if (expansion_state->function_like &&
-			    expansion_state->begin_expansion) {
-				expansion_state->begin_expansion = false;
-				if (!beginFunctionLikeMacroExpansion(state)) {
-					stopExpansion(&state->pp_state);
-					state->expand_macro = false;
+			if (!getNextTokenFromMacro(state, token, &ctx)) {
+				goto out;
+			}
+		} else {
+			if (state->c == INPUT_EOF) {
+				createSimpleToken(token, &ctx, TOKEN_EOF);
+			} else if (state->c == '#') {
+				// preprocessor
+				if (!state->line_beginning) {
+					status = false;
+					lexerError(state,
+					           "Preprocessor definitions must start at the "
+					           "beginning of a line");
 					goto out;
 				}
-			}
-
-			struct PreprocessorToken pp_token;
-			if (!getExpandedToken(&state->pp_state, &state->identifiers,
-			                      &pp_token)) {
-				stopExpansion(&state->pp_state);
-				state->expand_macro = false;
-				goto out;
-			}
-			if (pp_token.type != TOKEN_EOF) {
-				if (createLexerTokenFromPPToken(state, &pp_token, token)) {
-					status = true;
+				state->line_beginning = false;
+				NEXT(state, out);
+				if (!handlePreprocessorDirective(state, &ctx)) {
+					status = false;
+					goto out;
 				}
-				goto out;
+				createSimpleToken(token, &ctx, TOKEN_EMPTY);
 			} else {
-				stopExpansion(&state->pp_state);
-				state->expand_macro = false;
-			}
-		}
-
-		getFileContext(state, &ctx);
-		if (state->c == INPUT_EOF) {
-			getFileContext(state, &ctx);
-			createSimpleToken(token, &ctx, TOKEN_EOF);
-		} else if (state->c == '#') {
-			// preprocessor
-			if (!state->line_beginning) {
-				status = false;
-				lexerError(state,
-				           "Preprocessor definitions must start at the "
-				           "beginning of a line");
-				goto out;
-			}
-			state->line_beginning = false;
-			NEXT(state, out);
-			if (!handlePreprocessorDirective(state, &ctx)) {
-				status = false;
-				goto out;
-			}
-			createSimpleToken(token, &ctx, TOKEN_EMPTY);
-		} else {
-			state->line_beginning = false;
-			if (!lexTokens(state, token, &ctx)) {
-				status = false;
-				goto out;
+				state->line_beginning = false;
+				if (!lexTokens(state, token, &ctx)) {
+					status = false;
+					goto out;
+				}
 			}
 		}
 	} while (token->type == TOKEN_EMPTY);

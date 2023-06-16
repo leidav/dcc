@@ -60,7 +60,6 @@ struct ExpansionContext {
 };
 
 struct PreprocessorExpansionState {
-	struct ExpansionContext* current_context;
 	struct ExpansionContext* expansion_stack;
 	int expansion_depth;
 	int token_marker;
