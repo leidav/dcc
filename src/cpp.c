@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "allocator.h"
 #include "error.h"
 #include "lexer.h"
+#include "memory/linear_allocator.h"
 #include "string_set.h"
 
 #define SCRATCHPAD_SIZE (4096 << 0)
@@ -29,24 +29,27 @@ static int expand(struct PreprocessorState* state,
 
 int initPreprocessorState(struct PreprocessorState* state)
 {
-	if (createLinearAllocator(&state->allocator, SCRATCHPAD_SIZE, NULL)) {
+	struct Allocator* global_allocator = getGlobalAllocator();
+	struct MemoryArena arena;
+	if (allocateArena(&arena, global_allocator, SCRATCHPAD_SIZE) != 0) {
 		return -1;
 	}
+	initLinearAllocator(&state->allocator, &arena);
 
 	if (createPreprocessorTokenSet(&state->tokens,
 	                               PREPROCESSOR_MAX_DEFINITION_TOKEN_COUNT,
-	                               NULL) != 0) {
+	                               global_allocator) != 0) {
 		return -1;
 	}
 	if (createPreprocessorDefinitionSet(
 	        &state->definitions, PREPROCESSOR_MAX_DEFINITION_COUNT,
-	        LEXER_PP_NUMBER_STRINGSET_SIZE, NULL) != 0) {
+	        LEXER_PP_NUMBER_STRINGSET_SIZE, global_allocator) != 0) {
 		return -1;
 	}
 
-	state->expansion_state.expansion_stack =
-	    malloc(sizeof(*state->expansion_state.expansion_stack) *
-	           PREPROCESSOR_MAX_EXPANSION_DEPTH);
+	state->expansion_state.expansion_stack = allocate(
+	    global_allocator, sizeof(*state->expansion_state.expansion_stack) *
+	                          PREPROCESSOR_MAX_EXPANSION_DEPTH);
 	state->expansion_state.expansion_depth = 0;
 	return 0;
 }
@@ -75,13 +78,14 @@ int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
                                     int pp_definition_stringset_size,
                                     struct Allocator* allocator)
 {
-	set->definitions = malloc(sizeof(*set->definitions) * max_definitions);
+	set->definitions =
+	    allocate(allocator, sizeof(*set->definitions) * max_definitions);
 	if (set->definitions == NULL) {
 		return -1;
 	}
 	if (createStringSet(&set->pp_definition_names, pp_definition_stringset_size,
 	                    max_definitions, allocator) != 0) {
-		free(set->definitions);
+		deallocate(allocator, set->definitions);
 		return -1;
 	}
 	return 0;

@@ -512,6 +512,7 @@ static void consumeInput(struct LexerState* state)
 }
 int initLexer(struct LexerState* state, const char* file_path)
 {
+	struct Allocator* global_allocator = getGlobalAllocator();
 	memset(&state->current_pos, 0, sizeof(state->current_pos));
 	memset(&state->lookahead_pos, 0, sizeof(state->lookahead_pos));
 	state->line_beginning = true;
@@ -523,21 +524,23 @@ int initLexer(struct LexerState* state, const char* file_path)
 		return -1;
 	}
 	if (createStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
-	                    LEXER_MAX_IDENTIFIER_COUNT, NULL) != 0) {
+	                    LEXER_MAX_IDENTIFIER_COUNT, global_allocator) != 0) {
 		return -1;
 	}
 	if (createStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
-	                    LEXER_MAX_STRING_LITERAL_COUNT, NULL) != 0) {
+	                    LEXER_MAX_STRING_LITERAL_COUNT,
+	                    global_allocator) != 0) {
 		return -1;
 	}
 	if (createStringSet(&state->pp_numbers, LEXER_PP_NUMBER_STRINGSET_SIZE,
-	                    LEXER_MAX_PP_NUMBER_COUNT, NULL) != 0) {
+	                    LEXER_MAX_PP_NUMBER_COUNT, global_allocator) != 0) {
 		return -1;
 	}
 	state->constants.num = 0;
 	state->constants.max_count = LEXER_MAX_PP_CONSTANT_COUNT;
-	state->constants.constants = malloc(sizeof(*state->constants.constants) *
-	                                    LEXER_MAX_PP_CONSTANT_COUNT);
+	state->constants.constants =
+	    allocate(global_allocator, sizeof(*state->constants.constants) *
+	                                   LEXER_MAX_PP_CONSTANT_COUNT);
 	if (state->constants.constants == NULL) {
 		return -1;
 	}

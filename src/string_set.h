@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "allocator.h"
+#include "memory/linear_allocator.h"
 
 struct StringSetString {
 	uint16_t offset;
@@ -30,8 +30,7 @@ int createStringSetInBuffer(struct StringSet* stringset,
                             size_t string_buffer_size, int max_strings,
                             void* buffer, size_t buffer_size);
 
-int destroyStringSet(struct StringSet* stringset, size_t allocator_size,
-                     int max_strings);
+int destroyStringSet(struct StringSet* stringset);
 
 int addStringAndHash(struct StringSet* stringset, const char* string,
                      int length, uint32_t hash, bool* exists);
