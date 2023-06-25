@@ -71,16 +71,14 @@ void* allocateLinear(struct LinearAllocator* allocator, size_t size,
 void* reallocateLinear(struct LinearAllocator* allocator, void* ptr,
                        size_t new_size, size_t power_of_two_alignment)
 {
-	if (ptr == allocator->last) {
-		void* next_free = allocator->last + new_size;
-		if (next_free >= allocator->end) {
-			return NULL;
-		}
-		return next_free;
+	if (ptr != allocator->last) {
+		// Not supported
+		return NULL;
 	}
-	void* new_ptr = allocateLinear(allocator, new_size, power_of_two_alignment);
-	if (ptr != NULL) {
-		memcpy(new_ptr, ptr, allocator->free - allocator->last);
+	void* next_free = allocator->last + new_size;
+	if (next_free >= allocator->end) {
+		return NULL;
 	}
-	return new_ptr;
+	allocator->free = next_free;
+	return ptr;
 }
