@@ -84,7 +84,7 @@ int createPreprocessorDefinitionSet(struct PreprocessorDefinitionSet* set,
 	if (set->definitions == NULL) {
 		return -1;
 	}
-	if (createStringSet(&set->pp_definition_names, pp_definition_stringset_size,
+	if (initStringSet(&set->pp_definition_names, pp_definition_stringset_size,
 	                    max_definitions, allocator) != 0) {
 		deallocate(allocator, set->definitions);
 		return -1;

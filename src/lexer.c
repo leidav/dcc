@@ -523,17 +523,16 @@ int initLexer(struct LexerState* state, const char* file_path)
 		fprintf(stderr, "Could not open file\n");
 		return -1;
 	}
-	if (createStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
-	                    LEXER_MAX_IDENTIFIER_COUNT, global_allocator) != 0) {
+	if (initStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
+	                  LEXER_MAX_IDENTIFIER_COUNT, global_allocator) != 0) {
 		return -1;
 	}
-	if (createStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
-	                    LEXER_MAX_STRING_LITERAL_COUNT,
-	                    global_allocator) != 0) {
+	if (initStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
+	                  LEXER_MAX_STRING_LITERAL_COUNT, global_allocator) != 0) {
 		return -1;
 	}
-	if (createStringSet(&state->pp_numbers, LEXER_PP_NUMBER_STRINGSET_SIZE,
-	                    LEXER_MAX_PP_NUMBER_COUNT, global_allocator) != 0) {
+	if (initStringSet(&state->pp_numbers, LEXER_PP_NUMBER_STRINGSET_SIZE,
+	                  LEXER_MAX_PP_NUMBER_COUNT, global_allocator) != 0) {
 		return -1;
 	}
 	state->constants.num = 0;
@@ -1676,7 +1675,7 @@ static bool handleDefineDirective(struct LexerState* state,
 	struct StringSet params;
 	struct LinearAllocatorMarker marker =
 	    markLinearAllocatorState(state->scratchpad);
-	if (createStringSet(&params, 256, 64, ALLOCATOR_CAST(state->scratchpad)) !=
+	if (initStringSet(&params, 256, 64, ALLOCATOR_CAST(state->scratchpad)) !=
 	    0) {
 		goto out;
 	}

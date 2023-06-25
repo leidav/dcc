@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "memory/linear_allocator.h"
 #include "string_set.h"
 
 #define PREPROCESSOR_MAX_EXPANSION_DEPTH 1024

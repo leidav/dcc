@@ -5,6 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "memory/allocator.h"
+
+struct StringSetString {
+	uint16_t offset;
+	uint16_t length;
+};
+
 static uint32_t fnv1a(const char* string, int length)
 {
 	uint32_t hash = 2166136261;
@@ -58,26 +65,26 @@ uint32_t hashSubstring(const char* string, int length)
 }
 
 static int createString(struct StringSetString* string, const char* str,
-                        int length, struct LinearAllocator* string_allocator)
+                        int length, char* string_buffer, int buffer_size,
+                        int offset)
 {
-	string->length = length;
-	char* ptr =
-	    allocateAligned(ALLOCATOR_CAST(string_allocator), length + 1, 1);
-	if (!ptr) {
+	int new_offset = offset + length + 1;
+	if (new_offset >= buffer_size) {
 		return -1;
 	}
-	string->offset = ptr - (char*)string_allocator->arena->memory;
+	string->length = length;
+	char* ptr = string_buffer + offset;
+
+	string->offset = offset;
 	memcpy(ptr, str, length);
 	ptr[length] = 0;
-	return 0;
+	return new_offset;
 }
 
-static inline const char* getString(
-    const struct StringSetString* string,
-    const struct LinearAllocator* string_allocator)
+static inline const char* getString(const struct StringSetString* string,
+                                    char* string_buffer)
 {
-	void* start = string_allocator->arena->memory;
-	return start+ string->offset;
+	return string_buffer + string->offset;
 }
 
 static bool compareStrings(const struct StringSetString* string,
@@ -88,7 +95,7 @@ static bool compareStrings(const struct StringSetString* string,
 	if (length != length2) {
 		return false;
 	}
-	const char* string1 = getString(string, &stringset->string_allocator);
+	const char* string1 = getString(string, stringset->string_buffer);
 	for (int i = 0; i < length; i++) {
 		if (*string1 != *string2) {
 			return false;
@@ -99,39 +106,48 @@ static bool compareStrings(const struct StringSetString* string,
 	return true;
 }
 
-int createStringSet(struct StringSet* stringset, size_t string_buffer_size,
-                    int max_strings, struct Allocator* allocator)
+int initStringSet(struct StringSet* stringset, size_t string_buffer_size,
+                  int max_strings, struct Allocator* allocator)
 {
-	struct MemoryArena* arena = allocateArena(allocator, string_buffer_size);
-	if (arena == NULL) {
+	stringset->parent_allocator = allocator;
+	char* buffer = allocateAligned(allocator, string_buffer_size, 1);
+	if (buffer == NULL) {
 		return -1;
 	}
-	initLinearAllocator(&stringset->string_allocator, arena);
-
-	stringset->parent_allocator = allocator;
+	stringset->string_buffer = buffer;
+	stringset->buffer_size = string_buffer_size;
+	stringset->offset = 0;
 	stringset->num = 0;
 	stringset->max_num = max_strings;
 	stringset->strings =
 	    ALLOCATE_TYPE(allocator, max_strings, typeof(*stringset->strings));
+	if (!stringset->strings) {
+		goto err1;
+	}
 	stringset->hashes =
 	    ALLOCATE_TYPE(allocator, max_strings, typeof(*stringset->hashes));
-	if (!stringset->strings) {
-		return -1;
-	}
 	if (!stringset->hashes) {
-		deallocate(allocator, stringset->strings);
-		return -1;
+		goto err2;
 	}
 	return 0;
+
+err2:
+	deallocate(allocator, stringset->strings);
+err1:
+	deallocate(allocator, stringset->string_buffer);
+	return -1;
 }
 
-int destroyStringSet(struct StringSet* stringset)
+int cleanupStringSet(struct StringSet* stringset)
 {
-	cleanupLinearAllocator(&stringset->string_allocator);
+	deallocate(stringset->parent_allocator, stringset->string_buffer);
 	deallocate(stringset->parent_allocator, stringset->strings);
 	deallocate(stringset->parent_allocator, stringset->hashes);
+	stringset->string_buffer = NULL;
 	stringset->strings = NULL;
 	stringset->hashes = NULL;
+	stringset->offset = 0;
+	stringset->buffer_size = 0;
 	stringset->num = 0;
 	stringset->max_num = 0;
 	return 0;
@@ -160,8 +176,13 @@ int addStringAndHash(struct StringSet* stringset, const char* string,
 	}
 	int index = stringset->num++;
 	stringset->hashes[index] = hash;
-	createString(&stringset->strings[index], string, length,
-	             &stringset->string_allocator);
+	int new_offset = createString(&stringset->strings[index], string, length,
+	                              stringset->string_buffer,
+	                              stringset->buffer_size, stringset->offset);
+	if (new_offset < 0) {
+		return -1;
+	}
+	stringset->offset = new_offset;
 
 	return index;
 }
@@ -174,7 +195,7 @@ int addString(struct StringSet* stringset, const char* string, int length)
 
 const char* getStringAt(struct StringSet* stringset, int index)
 {
-	return getString(&stringset->strings[index], &stringset->string_allocator);
+	return getString(&stringset->strings[index], stringset->string_buffer);
 }
 
 uint32_t getHashAt(struct StringSet* stringset, int index)
