@@ -7,8 +7,7 @@ static struct LinearAllocator allocator;
 
 int scratchpadInit()
 {
-	struct MemoryArena* arena =
-	    globallyAllocateArena(SCRATCHPAD_SIZE);
+	struct MemoryArena* arena = globallyAllocateArena(SCRATCHPAD_SIZE);
 	if (arena == NULL) {
 		return -1;
 	}
