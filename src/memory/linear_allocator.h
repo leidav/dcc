@@ -10,10 +10,14 @@
 struct LinearAllocator {
 	struct Allocator base;
 	struct MemoryArena* arena;
-	void* start;
 	void* free;
 	void* last;
 	void* end;
+};
+
+struct LinearAllocatorMarker {
+	ptrdiff_t pos;
+	ptrdiff_t last;
 };
 
 void initLinearAllocator(struct LinearAllocator* allocator,
@@ -21,9 +25,13 @@ void initLinearAllocator(struct LinearAllocator* allocator,
 
 void cleanupLinearAllocator(struct LinearAllocator* allocator);
 
-size_t markLinearAllocatorState(struct LinearAllocator* allocator);
+struct LinearAllocatorMarker markLinearAllocatorState(
+    struct LinearAllocator* allocator);
 
-void resetLinearAllocatorState(struct LinearAllocator* allocator, size_t pos);
+void resetLinearAllocatorState(struct LinearAllocator* allocator,
+                               struct LinearAllocatorMarker* state);
+
+void resetLinearAllocator(struct LinearAllocator* allocator);
 
 void* allocateLinear(struct LinearAllocator* allocator, size_t size,
                      size_t power_of_two_alignment);

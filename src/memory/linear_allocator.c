@@ -28,30 +28,41 @@ void initLinearAllocator(struct LinearAllocator* allocator,
 	initAllocator(&allocator->base, allocateLinearWrapper,
 	              reallocateLinearWrapper, deallocateNothing);
 	allocator->arena = arena;
-	void* memory = arena->memory;
-	allocator->end = memory + arena->size;
-	allocator->start = memory;
-	allocator->free = memory;
-	allocator->last = memory;
+	void* start = arena->memory;
+	allocator->end = start + arena->size;
+	allocator->free = start;
+	allocator->last = start;
 }
 void cleanupLinearAllocator(struct LinearAllocator* allocator)
 {
 	deallocateArena(allocator->arena);
 	allocator->arena = NULL;
-	allocator->start = NULL;
 	allocator->free = NULL;
 	allocator->last = NULL;
 	allocator->end = NULL;
 }
 
-size_t markLinearAllocatorState(struct LinearAllocator* allocator)
+struct LinearAllocatorMarker markLinearAllocatorState(
+    struct LinearAllocator* allocator)
 {
-	return allocator->free - allocator->start;
+	void* start = allocator->arena->memory;
+	struct LinearAllocatorMarker state = {.pos = allocator->free - start,
+	                                      .last = allocator->last - start};
+	return state;
 }
 
-void resetLinearAllocatorState(struct LinearAllocator* allocator, size_t pos)
+void resetLinearAllocatorState(struct LinearAllocator* allocator,
+                               struct LinearAllocatorMarker* state)
 {
-	allocator->free = allocator->start + pos;
+	void* start = allocator->arena->memory;
+	allocator->free = start + state->pos;
+	allocator->last = start + state->last;
+}
+void resetLinearAllocator(struct LinearAllocator* allocator)
+{
+	void* start = allocator->arena->memory;
+	allocator->free = start;
+	allocator->last = start;
 }
 
 void* allocateLinear(struct LinearAllocator* allocator, size_t size,

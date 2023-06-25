@@ -267,7 +267,7 @@ void stopExpansion(struct PreprocessorState* state)
 {
 	state->expansion_state.begin_expansion = false;
 	state->expansion_state.function_like = false;
-	resetLinearAllocatorState(&state->allocator, 0);
+	resetLinearAllocator(&state->allocator);
 	state->tokens.num = state->expansion_state.token_marker;
 }
 

@@ -825,7 +825,8 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
                              const struct FileContext* ctx)
 {
 	int length = 0;
-	size_t marker = markLinearAllocatorState(state->scratchpad);
+	struct LinearAllocatorMarker marker =
+	    markLinearAllocatorState(state->scratchpad);
 	char* read_buffer = ALLOCATE_STRING(state->scratchpad, MAX_STRING_LENGTH);
 	if (!read_buffer) {
 		return false;
@@ -853,7 +854,7 @@ static bool lexStringLiteral(struct LexerState* state, struct LexerToken* token,
 	createStringConstantToken(token, ctx, index);
 	status = true;
 out:
-	resetLinearAllocatorState(state->scratchpad, marker);
+	resetLinearAllocatorState(state->scratchpad, &marker);
 	return true;
 }
 
@@ -932,7 +933,8 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
                     const struct FileContext* ctx)
 {
 	bool status = false;
-	size_t marker = markLinearAllocatorState(state->scratchpad);
+	struct LinearAllocatorMarker marker =
+	    markLinearAllocatorState(state->scratchpad);
 	char* read_buffer =
 	    ALLOCATE_STRING(state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
@@ -959,7 +961,7 @@ static bool lexWord(struct LexerState* state, struct LexerToken* token,
 		                                        length, hash);
 	}
 out:
-	resetLinearAllocatorState(state->scratchpad, marker);
+	resetLinearAllocatorState(state->scratchpad, &marker);
 	return status;
 }
 static const double exponent_lookup[] = {1e1,  1e2,  1e4, 1e8,
@@ -1256,7 +1258,8 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
                         const struct FileContext* ctx,
                         bool create_number_constant)
 {
-	size_t marker = markLinearAllocatorState(state->scratchpad);
+	struct LinearAllocatorMarker marker =
+	    markLinearAllocatorState(state->scratchpad);
 	bool status = false;
 	char* read_buffer =
 	    ALLOCATE_STRING(state->scratchpad, MAX_PP_NUMBER_LENGTH);
@@ -1305,7 +1308,7 @@ static bool lexPPNumber(struct LexerState* state, struct LexerToken* token,
 	}
 	status = true;
 out:
-	resetLinearAllocatorState(state->scratchpad, marker);
+	resetLinearAllocatorState(state->scratchpad, &marker);
 	return status;
 }
 
@@ -1604,7 +1607,8 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 				createSimpleToken(&token, &macro_context, PP_STRINGIFY);
 			}
 		} else if (function_like && isAlphabetic(state->c)) {
-			size_t marker = markLinearAllocatorState(state->scratchpad);
+			struct LinearAllocatorMarker marker =
+			    markLinearAllocatorState(state->scratchpad);
 			char* read_buffer =
 			    ALLOCATE_STRING(state->scratchpad, MAX_IDENTIFIER_LENGTH);
 			if (read_buffer == NULL) {
@@ -1612,7 +1616,7 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 			}
 			int length = readWord(state, &macro_context, read_buffer);
 			if (length == 0) {
-				resetLinearAllocatorState(state->scratchpad, marker);
+				resetLinearAllocatorState(state->scratchpad, &marker);
 				goto out;
 			}
 			uint32_t hash = hashSubstring(read_buffer, length);
@@ -1623,7 +1627,7 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 				createKeywordOrIdentifierToken(state, &token, &macro_context,
 				                               read_buffer, length, hash);
 			}
-			resetLinearAllocatorState(state->scratchpad, marker);
+			resetLinearAllocatorState(state->scratchpad, &marker);
 		} else {
 			if (!lexTokens(state, &token, &macro_context)) {
 				goto out;
@@ -1670,7 +1674,8 @@ static bool handleDefineDirective(struct LexerState* state,
 	bool status = false;
 
 	struct StringSet params;
-	size_t marker = markLinearAllocatorState(state->scratchpad);
+	struct LinearAllocatorMarker marker =
+	    markLinearAllocatorState(state->scratchpad);
 	if (createStringSet(&params, 256, 64, ALLOCATOR_CAST(state->scratchpad)) !=
 	    0) {
 		goto out;
@@ -1738,7 +1743,7 @@ static bool handleDefineDirective(struct LexerState* state,
 	}
 	status = true;
 out:
-	resetLinearAllocatorState(state->scratchpad, marker);
+	resetLinearAllocatorState(state->scratchpad, &marker);
 	return status;
 }
 
@@ -1758,7 +1763,8 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 
 {
 	bool status = false;
-	size_t marker = markLinearAllocatorState(state->scratchpad);
+	struct LinearAllocatorMarker marker =
+	    markLinearAllocatorState(state->scratchpad);
 	char* read_buffer =
 	    ALLOCATE_STRING(state->scratchpad, MAX_IDENTIFIER_LENGTH);
 	if (!read_buffer) {
@@ -1825,7 +1831,7 @@ static bool handlePreprocessorDirective(struct LexerState* state,
 	}
 	status = true;
 out:
-	resetLinearAllocatorState(state->scratchpad, marker);
+	resetLinearAllocatorState(state->scratchpad, &marker);
 	return status;
 }
 

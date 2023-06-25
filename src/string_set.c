@@ -66,7 +66,7 @@ static int createString(struct StringSetString* string, const char* str,
 	if (!ptr) {
 		return -1;
 	}
-	string->offset = ptr - (char*)string_allocator->start;
+	string->offset = ptr - (char*)string_allocator->arena->memory;
 	memcpy(ptr, str, length);
 	ptr[length] = 0;
 	return 0;
@@ -76,7 +76,8 @@ static inline const char* getString(
     const struct StringSetString* string,
     const struct LinearAllocator* string_allocator)
 {
-	return string_allocator->start + string->offset;
+	void* start = string_allocator->arena->memory;
+	return start+ string->offset;
 }
 
 static bool compareStrings(const struct StringSetString* string,
