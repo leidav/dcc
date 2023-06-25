@@ -9,7 +9,7 @@
 
 struct LinearAllocator {
 	struct Allocator base;
-	struct MemoryArena arena;
+	struct MemoryArena* arena;
 	void* start;
 	void* free;
 	void* last;
@@ -17,7 +17,7 @@ struct LinearAllocator {
 };
 
 void initLinearAllocator(struct LinearAllocator* allocator,
-                         const struct MemoryArena* arena);
+                         struct MemoryArena* arena);
 
 void cleanupLinearAllocator(struct LinearAllocator* allocator);
 

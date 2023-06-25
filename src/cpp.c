@@ -30,11 +30,12 @@ static int expand(struct PreprocessorState* state,
 int initPreprocessorState(struct PreprocessorState* state)
 {
 	struct Allocator* global_allocator = getGlobalAllocator();
-	struct MemoryArena arena;
-	if (allocateArena(&arena, global_allocator, SCRATCHPAD_SIZE) != 0) {
+	struct MemoryArena* arena =
+	    allocateArena(global_allocator, SCRATCHPAD_SIZE);
+	if (arena == NULL) {
 		return -1;
 	}
-	initLinearAllocator(&state->allocator, &arena);
+	initLinearAllocator(&state->allocator, arena);
 
 	if (createPreprocessorTokenSet(&state->tokens,
 	                               PREPROCESSOR_MAX_DEFINITION_TOKEN_COUNT,

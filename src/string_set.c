@@ -101,11 +101,11 @@ static bool compareStrings(const struct StringSetString* string,
 int createStringSet(struct StringSet* stringset, size_t string_buffer_size,
                     int max_strings, struct Allocator* allocator)
 {
-	struct MemoryArena arena;
-	if (allocateArena(&arena, allocator, string_buffer_size) != 0) {
+	struct MemoryArena* arena = allocateArena(allocator, string_buffer_size);
+	if (arena == NULL) {
 		return -1;
 	}
-	initLinearAllocator(&stringset->string_allocator, &arena);
+	initLinearAllocator(&stringset->string_allocator, arena);
 
 	stringset->parent_allocator = allocator;
 	stringset->num = 0;

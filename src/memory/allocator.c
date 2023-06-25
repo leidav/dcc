@@ -47,49 +47,48 @@ void deallocate(struct Allocator* allocator, void* ptr)
 	allocator->deallocate(allocator, ptr);
 }
 
-int allocateArena(struct MemoryArena* arena, struct Allocator* allocator,
-                  size_t size)
+struct MemoryArena* allocateArena(struct Allocator* allocator, size_t size)
 {
-	void* memory = allocate(allocator, size);
-	if (!memory) {
-		return -1;
+	struct MemoryArena* arena =
+	    allocateAligned(allocator, sizeof(struct MemoryArena) + size,
+	                    alignof(struct MemoryArena));
+	if (arena == NULL) {
+		return NULL;
 	}
 	arena->size = size;
-	arena->memory = memory;
 	arena->owner = allocator;
-	arena->resizable = false;
-	return 0;
+	return arena;
 }
 
-int globallyAllocateArena(struct MemoryArena* arena, size_t size)
+struct MemoryArena* globallyAllocateArena(size_t size)
 {
 	struct Allocator* allocator = getGlobalAllocator();
-	void* memory = allocate(allocator, size);
-	if (!memory) {
-		return -1;
-	}
-	arena->size = size;
-	arena->memory = memory;
-	arena->owner = allocator;
-	arena->resizable = true;
-	return 0;
+	return allocateArena(allocator, size);
 }
 
-void initNonOwningArena(struct MemoryArena* arena, void* buffer, size_t size)
+struct MemoryArena* createNonOwningArena(void* buffer, size_t buffer_size)
 {
-	arena->memory = buffer;
-	arena->size = size;
+	size_t offset = alignmentOffset(buffer, alignof(struct MemoryArena));
+	size_t size = sizeof(struct MemoryArena) + offset;
+	if (size > buffer_size) {
+		return NULL;
+	}
+	size_t payload_size = buffer_size - size;
+	struct MemoryArena* arena = buffer + offset;
+	arena->size = payload_size;
 	arena->owner = NULL;
-	arena->resizable = false;
+	return arena;
 }
 
-void cleanupArena(struct MemoryArena* arena)
+void deallocateArena(struct MemoryArena* arena)
 {
-	if (arena->owner != NULL) {
-		deallocate(arena->owner, arena->memory);
+	if (arena == NULL) {
+		return;
 	}
-	arena->memory = NULL;
-	arena->size = 0;
+
+	if (arena->owner != NULL) {
+		deallocate(arena->owner, arena);
+	}
 }
 
 void initAllocator(struct Allocator* allocator, AllocateFn allocate,

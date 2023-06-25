@@ -1883,6 +1883,10 @@ static bool beginFunctionLikeMacroExpansion(struct LexerState* state)
 	if (param_count > 0) {
 		struct TokenIterator* param_iterators = ALLOCATE_TYPE(
 		    &pp_state->allocator, param_count, typeof(*param_iterators));
+		if (param_iterators == NULL) {
+			generalError("token iterator allocation failed");
+			goto out;
+		}
 		current_context->param.iterators = param_iterators;
 		current_context->param.parent = NULL;
 

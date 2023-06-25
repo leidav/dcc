@@ -7,12 +7,12 @@ static struct LinearAllocator allocator;
 
 int scratchpadInit()
 {
-	struct Allocator* global_allocator = getGlobalAllocator();
-	struct MemoryArena arena;
-	if (allocateArena(&arena, global_allocator, SCRATCHPAD_SIZE) != 0) {
+	struct MemoryArena* arena =
+	    globallyAllocateArena(SCRATCHPAD_SIZE);
+	if (arena == NULL) {
 		return -1;
 	}
-	initLinearAllocator(&allocator, &arena);
+	initLinearAllocator(&allocator, arena);
 	return 0;
 }
 

@@ -23,11 +23,11 @@ static void deallocateNothing(void* allocator, void* ptr)
 }
 
 void initLinearAllocator(struct LinearAllocator* allocator,
-                         const struct MemoryArena* arena)
+                         struct MemoryArena* arena)
 {
 	initAllocator(&allocator->base, allocateLinearWrapper,
 	              reallocateLinearWrapper, deallocateNothing);
-	allocator->arena = *arena;
+	allocator->arena = arena;
 	void* memory = arena->memory;
 	allocator->end = memory + arena->size;
 	allocator->start = memory;
@@ -36,7 +36,8 @@ void initLinearAllocator(struct LinearAllocator* allocator,
 }
 void cleanupLinearAllocator(struct LinearAllocator* allocator)
 {
-	cleanupArena(&allocator->arena);
+	deallocateArena(allocator->arena);
+	allocator->arena = NULL;
 	allocator->start = NULL;
 	allocator->free = NULL;
 	allocator->last = NULL;
