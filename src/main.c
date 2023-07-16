@@ -19,9 +19,8 @@
 #include <unistd.h>
 
 #include "error.h"
-#include "helper.h"
 #include "lexer.h"
-#include "scratchpad.h"
+#include "memory/scratchpad.h"
 
 int main(int argc, const char** argv)
 {
