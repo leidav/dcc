@@ -13,6 +13,8 @@
  *	along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <inttypes.h>
+
 #include "lexer.h"
 
 #define RETURN_AS_STRING_IF_MATCH(name) \
@@ -167,7 +169,7 @@ void printToken(struct LexerState* state, const struct LexerToken* token)
 	} else if ((token->type == CONSTANT_INT) ||
 	           (token->type == CONSTANT_UNSIGNED_INT)) {
 		uint64_t value = token->value.int_literal;
-		printf("line:%d, column: %d, type: LITERAL_INT, value: %lu\n",
+		printf("line:%d, column: %d, type: LITERAL_INT, value: %" PRIu64 "\n",
 		       token->line + 1, token->column + 1, value);
 	} else if (token->type == CONSTANT_DOUBLE) {
 		double value = token->value.double_literal;
