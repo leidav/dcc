@@ -19,6 +19,7 @@
 #include <stdbool.h>
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 const static inline bool isDecimalDigit(unsigned int c)
 {

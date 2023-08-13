@@ -17,11 +17,14 @@ target_sources(
   "${CMAKE_CURRENT_SOURCE_DIR}/memory/allocator.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/memory/linear_allocator.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/memory/linear_allocator.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/memory/block_allocator.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/memory/block_allocator.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/memory/scratchpad.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/memory/scratchpad.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/error.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/error.h"
 )
+target_include_directories(dcc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(dcc PRIVATE c_std_11)
 
 #target_compile_options(dcc PRIVATE -fsanitize=address,undefined)
