@@ -37,6 +37,7 @@ void* allocateBlock(struct BlockAllocator* allocator)
 		unsigned char* next_brk = allocator->brk + block_size;
 		if (next_brk <= allocator->end) {
 			next = (struct Block*)allocator->brk;
+			next->next = NULL;
 			allocator->brk = next_brk;
 		}
 	} else {
