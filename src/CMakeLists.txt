@@ -1,4 +1,7 @@
-add_executable(dcc main.c)
+add_executable(dcc-bin "${CMAKE_CURRENT_SOURCE_DIR}/main.c")
+
+add_library(dcc STATIC)
+
 target_sources( 
 	dcc PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/helper.h"
@@ -24,8 +27,11 @@ target_sources(
   "${CMAKE_CURRENT_SOURCE_DIR}/error.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/error.h"
 )
-target_include_directories(dcc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_features(dcc PRIVATE c_std_11)
+target_include_directories(dcc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(dcc PUBLIC c_std_11)
+
+target_link_libraries(dcc-bin dcc)
+set_target_properties(dcc-bin PROPERTIES RUNTIME_OUTPUT_NAME dcc)
 
 #target_compile_options(dcc PRIVATE -fsanitize=address,undefined)
 #target_link_options(dcc PRIVATE -fsanitize=address,undefined)
