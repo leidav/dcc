@@ -1,6 +1,7 @@
 #include "block_allocator.h"
 
 #include <assert.h>
+#include <stdio.h>
 
 #include "helper.h"
 
@@ -19,9 +20,11 @@ void initBlockAllocator(struct BlockAllocator* allocator,
 	allocator->arena = arena;
 	allocator->end = arena->memory + arena->size;
 	allocator->block_size = size;
-	struct Block* next_free = (struct Block*)arena->memory + offset;
-	allocator->brk = (unsigned char*)(next_free + 1);
+
+	struct Block* next_free = (struct Block*)(arena->memory + offset);
+	allocator->brk = ((unsigned char*)next_free) + block_size;
 	next_free->next = NULL;
+	allocator->next_free = next_free;
 }
 
 void* allocateBlock(struct BlockAllocator* allocator)

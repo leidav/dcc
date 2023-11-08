@@ -33,5 +33,5 @@ target_compile_features(dcc PUBLIC c_std_11)
 target_link_libraries(dcc-bin dcc)
 set_target_properties(dcc-bin PROPERTIES RUNTIME_OUTPUT_NAME dcc)
 
-#target_compile_options(dcc PRIVATE -fsanitize=address,undefined)
-#target_link_options(dcc PRIVATE -fsanitize=address,undefined)
+#target_compile_options(dcc PUBLIC -fsanitize=address,undefined)
+#target_link_options(dcc PUBLIC -fsanitize=address,undefined)
