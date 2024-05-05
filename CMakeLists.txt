@@ -12,5 +12,7 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
+include(CTest)
+
 add_subdirectory(src)
-add_subdirectory(test/unit_test)
+add_subdirectory(test)

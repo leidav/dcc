@@ -3,6 +3,8 @@
 #include <memory/block_allocator.h>
 #include <stdio.h>
 
+#include "test.h"
+
 #define MEMORY_SIZE 256
 #define BLOCK_SIZE 32
 #define MAX_ALLOCATIONS 4
@@ -11,6 +13,11 @@ unsigned char* memory[MEMORY_SIZE];
 
 int main()
 {
+	/*int x = 0;
+	EXPECT_EQ(x, 10);
+	EXPECT_EQ(x, 10);
+	EXPECT_TRUE(x);
+	*/
 	struct MemoryArena* arena = createNonOwningArena(memory, MEMORY_SIZE);
 	struct BlockAllocator allocator;
 	initBlockAllocator(&allocator, arena, BLOCK_SIZE, 16);
@@ -34,6 +41,5 @@ int main()
 	allocations[3] = allocateBlock(&allocator);
 	assert(allocations[1] == old_mem3);
 	assert(allocations[3] == old_mem1);
-
 	return 0;
 }
