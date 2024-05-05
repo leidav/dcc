@@ -146,45 +146,75 @@ static const char* getTokenName(enum TokenType type)
 
 void printToken(struct LexerState* state, const struct LexerToken* token)
 {
-	if (token->type == IDENTIFIER) {
-		int index = token->value.string_index;
-		printf("line:%d, column: %d, type: IDENTIFIER, id:%d, name: \"%s\"\n",
-		       token->line + 1, token->column + 1, index,
-		       getStringAt(&state->identifiers, index));
-	} else if (token->type == PP_PARAM) {
-		int index = token->value.param_index;
-		printf("line:%d, column: %d, type: PP_PARAM, param:%d\n",
-		       token->line + 1, token->column + 1, index);
-	} else if (token->type == LITERAL_STRING) {
-		int index = token->value.string_index;
-		printf(
-		    "line:%d, column: %d, type: LITERAL_STRING, id:%d, value: \"%s\"\n",
-		    token->line + 1, token->column + 1, index,
-		    getStringAt(&state->string_literals, index));
-	} else if (token->type == PP_NUMBER) {
-		int index = token->value.string_index;
-		printf("line:%d, column: %d, type: PP_NUMBER, id:%d, value: \"%s\"\n",
-		       token->line + 1, token->column + 1, index,
-		       getStringAt(&state->pp_numbers, index));
-	} else if ((token->type == CONSTANT_INT) ||
-	           (token->type == CONSTANT_UNSIGNED_INT)) {
-		uint64_t value = token->value.int_literal;
-		printf("line:%d, column: %d, type: LITERAL_INT, value: %" PRIu64 "\n",
-		       token->line + 1, token->column + 1, value);
-	} else if (token->type == CONSTANT_DOUBLE) {
-		double value = token->value.double_literal;
-		printf("line:%d, column: %d, type: LITERAL_DOUBLE, value: %f\n",
-		       token->line + 1, token->column + 1, value);
-	} else if (token->type == CONSTANT_FLOAT) {
-		float value = token->value.float_literal;
-		printf("line:%d, column: %d, type: LITERAL_FLOAT, value: %f\n",
-		       token->line + 1, token->column + 1, value);
-	} else if (token->type == CONSTANT_CHAR) {
-		int value = token->value.character_literal;
-		printf("line:%d, column: %d, type: LITERAL_CHAR, value: \'%c\' (%d)\n",
-		       token->line + 1, token->column + 1, value, value);
-	} else {
-		printf("line:%d, column: %d, type: %s\n", token->line + 1,
-		       token->column + 1, getTokenName(token->type));
+	switch (token->type) {
+		case IDENTIFIER: {
+			int index = token->value.string_index;
+			printf(
+			    "line:%d, column: %d, type: IDENTIFIER, id:%d, name: "
+			    "\"%s\"\n",
+			    token->line + 1, token->column + 1, index,
+			    getStringAt(&state->identifiers, index));
+			break;
+		}
+		case PP_PARAM: {
+			int index = token->value.param_index;
+			printf("line:%d, column: %d, type: PP_PARAM, param:%d\n",
+			       token->line + 1, token->column + 1, index);
+
+			break;
+		}
+		case LITERAL_STRING: {
+			int index = token->value.string_index;
+			printf(
+			    "line:%d, column: %d, type: LITERAL_STRING, id:%d, "
+			    "value: "
+			    "\"%s\"\n",
+			    token->line + 1, token->column + 1, index,
+			    getStringAt(&state->string_literals, index));
+			break;
+		}
+		case PP_NUMBER: {
+			int index = token->value.string_index;
+			printf(
+			    "line:%d, column: %d, type: PP_NUMBER, id:%d, value: "
+			    "\"%s\"\n",
+			    token->line + 1, token->column + 1, index,
+			    getStringAt(&state->pp_numbers, index));
+			break;
+		}
+		case CONSTANT_INT:
+		case CONSTANT_UNSIGNED_INT: {
+			uint64_t value = token->value.int_literal;
+			printf(
+			    "line:%d, column: %d, type: LITERAL_INT, value: "
+			    "%" PRIu64 "\n",
+			    token->line + 1, token->column + 1, value);
+			break;
+		}
+		case CONSTANT_DOUBLE: {
+			double value = token->value.double_literal;
+			printf(
+			    "line:%d, column: %d, type: LITERAL_DOUBLE, value: "
+			    "%f\n",
+			    token->line + 1, token->column + 1, value);
+			break;
+		}
+		case CONSTANT_FLOAT: {
+			float value = token->value.float_literal;
+			printf("line:%d, column: %d, type: LITERAL_FLOAT, value: %f\n",
+			       token->line + 1, token->column + 1, value);
+			break;
+		}
+		case CONSTANT_CHAR: {
+			int value = token->value.character_literal;
+			printf(
+			    "line:%d, column: %d, type: LITERAL_CHAR, value: "
+			    "\'%c\' (%d)\n",
+			    token->line + 1, token->column + 1, value, value);
+			break;
+		}
+		default:
+			printf("line:%d, column: %d, type: %s\n", token->line + 1,
+			       token->column + 1, getTokenName(token->type));
 	}
 }
