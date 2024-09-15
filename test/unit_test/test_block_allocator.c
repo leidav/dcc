@@ -13,11 +13,6 @@ unsigned char* memory[MEMORY_SIZE];
 
 int main()
 {
-	/*int x = 0;
-	EXPECT_EQ(x, 10);
-	EXPECT_EQ(x, 10);
-	EXPECT_TRUE(x);
-	*/
 	struct MemoryArena* arena = createNonOwningArena(memory, MEMORY_SIZE);
 	struct BlockAllocator allocator;
 	initBlockAllocator(&allocator, arena, BLOCK_SIZE, 16);
@@ -39,7 +34,7 @@ int main()
 
 	allocations[1] = allocateBlock(&allocator);
 	allocations[3] = allocateBlock(&allocator);
-	assert(allocations[1] == old_mem3);
-	assert(allocations[3] == old_mem1);
+	EXPECT_EQ_PTR(allocations[1], old_mem3);
+	EXPECT_EQ_PTR(allocations[3], old_mem1);
 	return 0;
 }
