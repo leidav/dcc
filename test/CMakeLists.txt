@@ -1,2 +1,3 @@
 add_subdirectory(test_helpers)
 add_subdirectory(unit_test)
+add_subdirectory(integration_test)
