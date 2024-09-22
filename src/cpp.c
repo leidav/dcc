@@ -309,13 +309,13 @@ bool prepareMacroParamTokens(struct PreprocessorState* state,
 		int type = token->type;
 
 		switch (type) {
-			case PARENTHESE_LEFT:
+			case PUNCTUATOR_PARENTHESE_LEFT:
 				counter++;
 				break;
-			case PARENTHESE_RIGHT:
+			case PUNCTUATOR_PARENTHESE_RIGHT:
 				counter--;
 				break;
-			case COMMA:
+			case PUNCTUATOR_COMMA:
 				if (counter == 1) {
 					if (param_index == expected_param_count - 1) {
 						generalError("to many macro parameters");
@@ -413,7 +413,7 @@ int expand(struct PreprocessorState* state, struct StringSet* identifiers,
 			struct ParamContext param_context = {NULL, NULL, 0};
 			if (isFunctionLike(def)) {
 				if ((it->cur > it->end) ||
-				    (getTokenAt(state, it->cur)->type != PARENTHESE_LEFT)) {
+				    (getTokenAt(state, it->cur)->type != PUNCTUATOR_PARENTHESE_LEFT)) {
 					generalError(
 					    "function like macro must be called like a "
 					    "function");
@@ -437,7 +437,7 @@ int expand(struct PreprocessorState* state, struct StringSet* identifiers,
 					param_context.num_params = num_params;
 
 				} else {
-					if (getTokenAt(state, it->cur)->type != PARENTHESE_RIGHT) {
+					if (getTokenAt(state, it->cur)->type != PUNCTUATOR_PARENTHESE_RIGHT) {
 						generalError("macro parantheses not closed");
 						return EXPANSION_RESULT_ERROR;
 					}

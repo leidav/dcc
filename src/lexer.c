@@ -1336,10 +1336,10 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Divison Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_DIV_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_DIV_ASSIGNMENT);
 			} else {
 				//  Division Operator
-				createSimpleToken(token, ctx, OPERATOR_DIV);
+				createSimpleToken(token, ctx, PUNCTUATOR_DIV);
 			}
 			break;
 		case '*':
@@ -1347,10 +1347,10 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Multiplication Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_MUL_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_MUL_ASSIGNMENT);
 			} else {
 				// ASTERISC
-				createSimpleToken(token, ctx, ASTERISC);
+				createSimpleToken(token, ctx, PUNCTUATOR_ASTERISC);
 			}
 			break;
 
@@ -1359,10 +1359,10 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Modulo Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_MODULO_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_MODULO_ASSIGNMENT);
 			} else {
 				// Modulo Operator
-				createSimpleToken(token, ctx, OPERATOR_MODULO);
+				createSimpleToken(token, ctx, PUNCTUATOR_MODULO);
 			}
 			break;
 		case '+':
@@ -1370,14 +1370,14 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Plus Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_PLUS_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_PLUS_ASSIGNMENT);
 			} else if (state->c == '+') {
 				// PlusPlus Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_PLUSPLUS);
+				createSimpleToken(token, ctx, PUNCTUATOR_PLUSPLUS);
 			} else {
 				// Plus Operator
-				createSimpleToken(token, ctx, OPERATOR_PLUS);
+				createSimpleToken(token, ctx, PUNCTUATOR_PLUS);
 			}
 			break;
 		case '-':
@@ -1385,18 +1385,18 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Minus Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_MINUS_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_MINUS_ASSIGNMENT);
 			} else if (state->c == '-') {
 				// MinusMinus Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_MINUSMINUS);
+				createSimpleToken(token, ctx, PUNCTUATOR_MINUSMINUS);
 			} else if (state->c == '>') {
 				// Dereference Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_DEREFERENCE);
+				createSimpleToken(token, ctx, PUNCTUATOR_DEREFERENCE);
 			} else {
 				// Minus Operator
-				createSimpleToken(token, ctx, OPERATOR_MINUS);
+				createSimpleToken(token, ctx, PUNCTUATOR_MINUS);
 			}
 			break;
 		case '&':
@@ -1404,14 +1404,14 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// And Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_AND_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_AND_ASSIGNMENT);
 			} else if (state->c == '&') {
 				// Logical And Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_LOGICAL_AND);
+				createSimpleToken(token, ctx, PUNCTUATOR_LOGICAL_AND);
 			} else {
 				// And Operator
-				createSimpleToken(token, ctx, OPERATOR_AND);
+				createSimpleToken(token, ctx, PUNCTUATOR_AND);
 			}
 			break;
 		case '|':
@@ -1419,14 +1419,14 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Or Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_OR_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_OR_ASSIGNMENT);
 			} else if (state->c == '|') {
 				// Logical Or Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_LOGICAL_OR);
+				createSimpleToken(token, ctx, PUNCTUATOR_LOGICAL_OR);
 			} else {
 				// Or Operator
-				createSimpleToken(token, ctx, OPERATOR_OR);
+				createSimpleToken(token, ctx, PUNCTUATOR_OR);
 			}
 			break;
 		case '^':
@@ -1434,27 +1434,27 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Xor Assignment Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_XOR_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_XOR_ASSIGNMENT);
 			} else {
 				// Xor Operator
-				createSimpleToken(token, ctx, OPERATOR_XOR);
+				createSimpleToken(token, ctx, PUNCTUATOR_XOR);
 			}
 			break;
 
 		case '~':
 			NEXT(state, out);
 			// Negate Operator
-			createSimpleToken(token, ctx, OPERATOR_NEGATE);
+			createSimpleToken(token, ctx, PUNCTUATOR_NEGATE);
 			break;
 		case '!':
 			NEXT(state, out);
 			if (state->c == '=') {
 				// Not Equal Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_NOT_EQUAL);
+				createSimpleToken(token, ctx, PUNCTUATOR_NOT_EQUAL);
 			} else {
 				// Logical Not Operator
-				createSimpleToken(token, ctx, OPERATOR_LOGICAL_NOT);
+				createSimpleToken(token, ctx, PUNCTUATOR_LOGICAL_NOT);
 			}
 			break;
 		case '<':
@@ -1465,18 +1465,18 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 					// Shift left Assignment Operator
 					NEXT(state, out);
 					createSimpleToken(token, ctx,
-					                  OPERATOR_SHIFT_LEFT_ASSIGNMENT);
+					                  PUNCTUATOR_SHIFT_LEFT_ASSIGNMENT);
 				} else {
 					// Shift left Operator
-					createSimpleToken(token, ctx, OPERATOR_SHIFT_LEFT);
+					createSimpleToken(token, ctx, PUNCTUATOR_SHIFT_LEFT);
 				}
 			} else if (state->c == '=') {
 				// Less or equal Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_LESS_OR_EQUAL);
+				createSimpleToken(token, ctx, PUNCTUATOR_LESS_OR_EQUAL);
 			} else {
 				// Less than Operator
-				createSimpleToken(token, ctx, OPERATOR_LESS);
+				createSimpleToken(token, ctx, PUNCTUATOR_LESS);
 			}
 			break;
 		case '>':
@@ -1487,18 +1487,18 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 					// Shift right Assignment Operator
 					NEXT(state, out);
 					createSimpleToken(token, ctx,
-					                  OPERATOR_SHIFT_RIGHT_ASSIGNMENT);
+					                  PUNCTUATOR_SHIFT_RIGHT_ASSIGNMENT);
 				} else {
 					// Shift right Operator
-					createSimpleToken(token, ctx, OPERATOR_SHIFT_RIGHT);
+					createSimpleToken(token, ctx, PUNCTUATOR_SHIFT_RIGHT);
 				}
 			} else if (state->c == '=') {
 				// Greater or equal Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_GREATER_OR_EQUAL);
+				createSimpleToken(token, ctx, PUNCTUATOR_GREATER_OR_EQUAL);
 			} else {
 				// Greater than Operator
-				createSimpleToken(token, ctx, OPERATOR_GREATER);
+				createSimpleToken(token, ctx, PUNCTUATOR_GREATER);
 			}
 			break;
 		case '=':
@@ -1506,51 +1506,51 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 			if (state->c == '=') {
 				// Equal Comparsion Operator
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_EQUAL);
+				createSimpleToken(token, ctx, PUNCTUATOR_EQUAL);
 			} else {
 				// Assignment Operator
-				createSimpleToken(token, ctx, OPERATOR_ASSIGNMENT);
+				createSimpleToken(token, ctx, PUNCTUATOR_ASSIGNMENT);
 			}
 			break;
 		case '?':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, OPERATOR_CONDITIONAL);
+			createSimpleToken(token, ctx, PUNCTUATOR_CONDITIONAL);
 			break;
 		case ':':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, COLON);
+			createSimpleToken(token, ctx, PUNCTUATOR_COLON);
 			break;
 		case ';':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, SEMICOLON);
+			createSimpleToken(token, ctx, PUNCTUATOR_SEMICOLON);
 			break;
 		case ',':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, COMMA);
+			createSimpleToken(token, ctx, PUNCTUATOR_COMMA);
 			break;
 		case '(':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, PARENTHESE_LEFT);
+			createSimpleToken(token, ctx, PUNCTUATOR_PARENTHESE_LEFT);
 			break;
 		case ')':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, PARENTHESE_RIGHT);
+			createSimpleToken(token, ctx, PUNCTUATOR_PARENTHESE_RIGHT);
 			break;
 		case '[':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, BRACKET_LEFT);
+			createSimpleToken(token, ctx, PUNCTUATOR_BRACKET_LEFT);
 			break;
 		case ']':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, BRACKET_RIGHT);
+			createSimpleToken(token, ctx, PUNCTUATOR_BRACKET_RIGHT);
 			break;
 		case '{':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, BRACE_LEFT);
+			createSimpleToken(token, ctx, PUNCTUATOR_BRACE_LEFT);
 			break;
 		case '}':
 			NEXT(state, out);
-			createSimpleToken(token, ctx, BRACE_RIGHT);
+			createSimpleToken(token, ctx, PUNCTUATOR_BRACE_RIGHT);
 			break;
 		case '"':
 			consumeInput(state);
@@ -1573,7 +1573,7 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 				}
 			} else {
 				NEXT(state, out);
-				createSimpleToken(token, ctx, OPERATOR_POINT);
+				createSimpleToken(token, ctx, PUNCTUATOR_POINT);
 			}
 			break;
 		default:
@@ -1862,9 +1862,9 @@ static bool lexMacroParamTokens(struct LexerState* state,
 			return false;
 		}
 
-		if (token.type == PARENTHESE_LEFT) {
+		if (token.type == PUNCTUATOR_PARENTHESE_LEFT) {
 			bracket_count++;
-		} else if (token.type == PARENTHESE_RIGHT) {
+		} else if (token.type == PUNCTUATOR_PARENTHESE_RIGHT) {
 			bracket_count--;
 		}
 		if (addPreprocessorToken(&state->pp_state, &state->constants, &token) <
