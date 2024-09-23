@@ -528,8 +528,8 @@ static void consumeInput(struct LexerState* state)
 int initLexer(struct LexerState* state, const char* file_path)
 {
 	struct Allocator* global_allocator = getGlobalAllocator();
-	memset(&state->current_pos, 0, sizeof(state->current_pos));
-	memset(&state->lookahead_pos, 0, sizeof(state->lookahead_pos));
+
+	memset(state, 0, sizeof(*state));
 	state->line_beginning = true;
 	state->scratchpad = (struct LinearAllocator*)getScratchpadAllocator();
 
@@ -540,14 +540,17 @@ int initLexer(struct LexerState* state, const char* file_path)
 	}
 	if (initStringSet(&state->identifiers, LEXER_IDENTIFIER_STRINGSET_SIZE,
 	                  LEXER_MAX_IDENTIFIER_COUNT, global_allocator) != 0) {
+		cleanupLexer(state);
 		return -1;
 	}
 	if (initStringSet(&state->string_literals, LEXER_LITERAL_STRINGSET_SIZE,
 	                  LEXER_MAX_STRING_LITERAL_COUNT, global_allocator) != 0) {
+		cleanupLexer(state);
 		return -1;
 	}
 	if (initStringSet(&state->pp_numbers, LEXER_PP_NUMBER_STRINGSET_SIZE,
 	                  LEXER_MAX_PP_NUMBER_COUNT, global_allocator) != 0) {
+		cleanupLexer(state);
 		return -1;
 	}
 	state->constants.num = 0;
@@ -556,6 +559,7 @@ int initLexer(struct LexerState* state, const char* file_path)
 	    allocate(global_allocator, sizeof(*state->constants.constants) *
 	                                   LEXER_MAX_PP_CONSTANT_COUNT);
 	if (state->constants.constants == NULL) {
+		cleanupLexer(state);
 		return -1;
 	}
 	readInputAndHandleLineEndings(state);
@@ -566,11 +570,22 @@ int initLexer(struct LexerState* state, const char* file_path)
 	state->error_handled = false;
 
 	if (initPreprocessorState(&state->pp_state) != 0) {
+		cleanupLexer(state);
 		return -1;
 	}
-
 	return 0;
 }
+
+void cleanupLexer(struct LexerState* state)
+{
+	cleanupPreprocessorState(&state->pp_state);
+	cleanupStringSet(&state->identifiers);
+	cleanupStringSet(&state->string_literals);
+	cleanupStringSet(&state->pp_numbers);
+	deallocate(getGlobalAllocator(), state->constants.constants);
+	closeInputFile(&state->current_file);
+}
+
 static bool skipIfWhiteSpace(struct LexerState* state)
 {
 	bool isWhitespace;
@@ -664,7 +679,7 @@ static bool consumeLexableChar(struct LexerState* state)
 
 static bool skipMultiLineComment(struct LexerState* state)
 {
-	bool status = false;
+	bool status = true;
 	while (state->c != INPUT_EOF) {
 		if (state->c == '\n') {
 			if (state->macro_body) {
@@ -1589,6 +1604,7 @@ bool lexTokens(struct LexerState* state, struct LexerToken* token,
 				}
 			} else {
 				createSimpleToken(token, ctx, TOKEN_UNKNOWN);
+				printf("char: %d\n", state->c);
 				unexpectedCharacterError(state);
 				goto out;
 			}
@@ -1605,7 +1621,9 @@ static bool lexMacroBody(struct LexerState* state, struct FileContext* ctx,
 {
 	bool status = false;
 	state->macro_body = true;
-	skipWhiteSpaceOrComments(state);
+	if (!skipWhiteSpaceOrComments(state)) {
+		goto out;
+	}
 	int start_index = getPreprocessorTokenPos(&state->pp_state);
 	int num = 0;
 	while (state->c != INPUT_EOF) {

@@ -126,6 +126,8 @@ struct PreprocessorDefinition* findDefinition(struct PreprocessorState* state,
 
 int initPreprocessorState(struct PreprocessorState* state);
 
+void cleanupPreprocessorState(struct PreprocessorState* state);
+
 void beginExpansion(struct PreprocessorState* state,
                     struct PreprocessorDefinition* definition);
 

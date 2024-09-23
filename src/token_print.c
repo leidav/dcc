@@ -218,3 +218,82 @@ void printToken(struct LexerState* state, const struct LexerToken* token)
 			       token->column + 1, getTokenName(token->type));
 	}
 }
+
+void printTokenAsCStruct(struct LexerState* state,
+                         const struct LexerToken* token)
+{
+	switch (token->type) {
+		case IDENTIFIER: {
+			int index = token->value.string_index;
+			printf(
+			    "{.line = %d, .column = %d, .type = IDENTIFIER, "
+			    ".string_value= \"%s\"\n},",
+			    token->line + 1, token->column + 1,
+			    getStringAt(&state->identifiers, index));
+			break;
+		}
+		case PP_PARAM: {
+			int index = token->value.param_index;
+			printf(
+			    "{.line = %d, .column = %d, .type = PP_PARAM, "
+			    ".int_value= %d\n},",
+			    token->line + 1, token->column + 1, index);
+
+			break;
+		}
+		case LITERAL_STRING: {
+			int index = token->value.string_index;
+			printf(
+			    "{.line = %d, .column = %d, .type = LITERAL_STRING, "
+			    ".string_value= \"%s\"\n},",
+			    token->line + 1, token->column + 1,
+			    getStringAt(&state->string_literals, index));
+			break;
+		}
+		case PP_NUMBER: {
+			int index = token->value.string_index;
+			printf(
+			    "{.line = %d, .column = %d, .type = PP_NUMBER, "
+			    ".string_value= \"%s\"\n},",
+			    token->line + 1, token->column + 1,
+			    getStringAt(&state->pp_numbers, index));
+			break;
+		}
+		case CONSTANT_INT:
+		case CONSTANT_UNSIGNED_INT: {
+			uint64_t value = token->value.int_literal;
+			printf(
+			    "{.line = %d, .column = %d, .type = CONSTANT_UNSIGNED_INT, "
+			    ".int_value = %" PRIu64 "},\n",
+			    token->line + 1, token->column + 1, value);
+			break;
+		}
+		case CONSTANT_DOUBLE: {
+			double value = token->value.double_literal;
+			printf(
+			    "{.line = %d, .column = %d, .type = CONSTANT_DOUBLE, "
+			    ".float_value = %f},\n",
+			    token->line + 1, token->column + 1, value);
+			break;
+		}
+		case CONSTANT_FLOAT: {
+			float value = token->value.float_literal;
+			printf(
+			    "{.line = %d, .column = %d, .type = CONSTANT_FLOAT, "
+			    ".float_value = %f},\n",
+			    token->line + 1, token->column + 1, value);
+			break;
+		}
+		case CONSTANT_CHAR: {
+			int value = token->value.character_literal;
+			printf(
+			    "{.line = %d, .column = %d, .type = CONSTANT_CHAR, "
+			    ".int_value = %d},\n",
+			    token->line + 1, token->column + 1, value);
+			break;
+		}
+		default:
+			printf("{.line = %d, .column = %d, .type = %s },\n", token->line + 1,
+			       token->column + 1, getTokenName(token->type));
+	}
+}

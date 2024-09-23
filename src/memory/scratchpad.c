@@ -17,6 +17,7 @@
 
 #include "allocator.h"
 #include "linear_allocator.h"
+#include "stdio.h"
 
 static struct LinearAllocator allocator;
 
@@ -28,6 +29,11 @@ int scratchpadInit()
 	}
 	initLinearAllocator(&allocator, arena);
 	return 0;
+}
+
+void scratchpadCleanup()
+{
+	cleanupLinearAllocator(&allocator);
 }
 
 struct Allocator* getScratchpadAllocator()

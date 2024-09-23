@@ -23,6 +23,7 @@
 
 struct InputFile {
 	const char* name;
+	const char* full_path;
 	char* buffer;
 	size_t read_pos;
 	size_t file_size;
@@ -30,5 +31,8 @@ struct InputFile {
 };
 
 int openInputFile(struct InputFile* file, const char* path, const char* name);
+
+void closeInputFile(struct InputFile* file);
+
 char readChar(struct InputFile* file);
 #endif

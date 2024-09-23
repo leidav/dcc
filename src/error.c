@@ -117,7 +117,7 @@ void lexerError(struct LexerState* state, const char* reason)
 	resetBold(is_tty);
 	if (state->current_pos.column < max_length) {
 		printErrorLine(state->current_pos.line_pos, state->current_pos.column,
-		               state->current_file.name, is_tty);
+		               state->current_file.full_path, is_tty);
 	}
 }
 

@@ -35,6 +35,7 @@ int main(int argc, const char** argv)
 	struct LexerState lexer_state;
 	if (initLexer(&lexer_state, argv[1]) != 0) {
 		fprintf(stderr, "Could not initialize lexer\n");
+		scratchpadCleanup();
 		return -1;
 	}
 	bool validInput = true;
@@ -69,5 +70,7 @@ int main(int argc, const char** argv)
 			printToken(&lexer_state, &t);
 		}
 	}
+	cleanupLexer(&lexer_state);
+	scratchpadCleanup();
 	return 0;
 }

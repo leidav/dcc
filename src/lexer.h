@@ -215,9 +215,14 @@ struct LexerState {
 
 int initLexer(struct LexerState* state, const char* file_path);
 
+void cleanupLexer(struct LexerState* state);
+
 bool getNextToken(struct LexerState* state, struct LexerToken* token);
 
 void printToken(struct LexerState* state, const struct LexerToken* token);
+
+void printTokenAsCStruct(struct LexerState* state,
+                         const struct LexerToken* token);
 
 bool createLexerTokenFromPPToken(struct LexerState* state,
                                  const struct PreprocessorToken* pp_token,

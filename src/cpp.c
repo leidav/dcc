@@ -45,6 +45,8 @@ static int expand(struct PreprocessorState* state,
 int initPreprocessorState(struct PreprocessorState* state)
 {
 	struct Allocator* global_allocator = getGlobalAllocator();
+	memset(state, 0, sizeof(*state));
+
 	struct MemoryArena* arena =
 	    allocateArena(global_allocator, SCRATCHPAD_SIZE);
 	if (arena == NULL) {
@@ -55,11 +57,13 @@ int initPreprocessorState(struct PreprocessorState* state)
 	if (createPreprocessorTokenSet(&state->tokens,
 	                               PREPROCESSOR_MAX_DEFINITION_TOKEN_COUNT,
 	                               global_allocator) != 0) {
+		cleanupPreprocessorState(state);
 		return -1;
 	}
 	if (createPreprocessorDefinitionSet(
 	        &state->definitions, PREPROCESSOR_MAX_DEFINITION_COUNT,
 	        LEXER_PP_NUMBER_STRINGSET_SIZE, global_allocator) != 0) {
+		cleanupPreprocessorState(state);
 		return -1;
 	}
 
@@ -68,6 +72,17 @@ int initPreprocessorState(struct PreprocessorState* state)
 	                          PREPROCESSOR_MAX_EXPANSION_DEPTH);
 	state->expansion_state.expansion_depth = 0;
 	return 0;
+}
+
+void cleanupPreprocessorState(struct PreprocessorState* state)
+{
+	struct Allocator* global_allocator = getGlobalAllocator();
+
+	deallocate(global_allocator, state->expansion_state.expansion_stack);
+	deallocate(global_allocator, state->definitions.definitions);
+	cleanupStringSet(&state->definitions.pp_definition_names);
+	deallocate(global_allocator, state->tokens.tokens);
+	cleanupLinearAllocator(&state->allocator);
 }
 
 int createPreprocessorTokenSet(struct PreprocessorTokenSet* set,
@@ -412,8 +427,8 @@ int expand(struct PreprocessorState* state, struct StringSet* identifiers,
 			int num_params = 0;
 			struct ParamContext param_context = {NULL, NULL, 0};
 			if (isFunctionLike(def)) {
-				if ((it->cur > it->end) ||
-				    (getTokenAt(state, it->cur)->type != PUNCTUATOR_PARENTHESE_LEFT)) {
+				if ((it->cur > it->end) || (getTokenAt(state, it->cur)->type !=
+				                            PUNCTUATOR_PARENTHESE_LEFT)) {
 					generalError(
 					    "function like macro must be called like a "
 					    "function");
@@ -437,7 +452,8 @@ int expand(struct PreprocessorState* state, struct StringSet* identifiers,
 					param_context.num_params = num_params;
 
 				} else {
-					if (getTokenAt(state, it->cur)->type != PUNCTUATOR_PARENTHESE_RIGHT) {
+					if (getTokenAt(state, it->cur)->type !=
+					    PUNCTUATOR_PARENTHESE_RIGHT) {
 						generalError("macro parantheses not closed");
 						return EXPANSION_RESULT_ERROR;
 					}

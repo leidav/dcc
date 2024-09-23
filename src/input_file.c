@@ -18,6 +18,7 @@
 #include <stdlib.h>
 
 #include "helper.h"
+#include "memory/allocator.h"
 
 static size_t getFileSize(FILE* file)
 {
@@ -39,10 +40,11 @@ int openInputFile(struct InputFile* file, const char* path, const char* name)
 		return -1;
 	}
 	file->name = name;
+	file->full_path = path;
 	file->file = f;
 	file->read_pos = 0;
 	file->file_size = getFileSize(f);
-	char* buffer = malloc(INPUT_CHUNK_SIZE);
+	char* buffer = allocate(getGlobalAllocator(), INPUT_CHUNK_SIZE);
 	if (!buffer) {
 		fclose(f);
 		return -1;
@@ -50,6 +52,12 @@ int openInputFile(struct InputFile* file, const char* path, const char* name)
 	file->buffer = buffer;
 	return 0;
 }
+
+void closeInputFile(struct InputFile* file)
+{
+	deallocate(getGlobalAllocator(), file->buffer);
+}
+
 char readChar(struct InputFile* file)
 {
 	size_t chunk_pos = file->read_pos % INPUT_CHUNK_SIZE;

@@ -20,6 +20,9 @@
 struct Allocator;
 
 int scratchpadInit();
+
+void scratchpadCleanup();
+
 struct Allocator* getScratchpadAllocator();
 
 #endif
