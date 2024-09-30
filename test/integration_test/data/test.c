@@ -1,36 +1,27 @@
-struct A {
+#include <stdio.h>
+
+struct Ab {
 	int a;
 	int b;
 };
 
-double asdf = 10;
-
-int function();
-
-int main()
+// Comment 1
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
+#define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
+int a;
+/***
+ * Comment 2
+ **/
+int b;
+int function(struct Ab* ab_structure, int c)
 {
-	int a = 10;
-	int b = 100;
-	a = 20;
-	{
-		int c = 1000;
-		b = 10;
-		c = a * b + 100;
-		c += 1;
-		b++;
-	}
-	int c;
-	if (a > 100) {
-		b = 1000;
-	}
+	return MAX(MIN(ab_structure->a, ab_structure->b), c);
+}
 
-	while (c == 100) {
-		b--;
-		a++;
-	}
-	for (int i = 100; i < 1000; i++) {
-		a++;
-		++b;
-	}
-	return a * b;
+int main(int argc, char** argv)
+{
+	struct Ab asdf = {3, 2};  // Comment 3
+
+	printf("result: %d\n", function(&asdf, 1));
+	return 0;
 }

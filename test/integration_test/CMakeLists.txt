@@ -1,4 +1,5 @@
-add_executable(test_lexer "${CMAKE_CURRENT_SOURCE_DIR}/test_lexer.c")
+add_executable(test_lexer "${CMAKE_CURRENT_SOURCE_DIR}/lexer/test_lexer.c")
+target_sources(test_lexer
 target_link_libraries(test_lexer dcc test_helpers)
 
 add_test(NAME "Lex Macros"
